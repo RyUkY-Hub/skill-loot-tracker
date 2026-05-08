@@ -52,7 +52,6 @@ public class SkillLootTrackerOverlay extends Overlay
         this.config = config;
         this.xpTrackerService = xpTrackerService;
         this.tooltipManager = tooltipManager;
-        this.xpTooltip.getComponent().setPreferredSize(new Dimension(150, 0));
         setPosition(OverlayPosition.TOP_CENTER);
         addMenuEntry(RUNELITE_OVERLAY_CONFIG, OPTION_CONFIGURE, "XP Globes overlay");
     }
