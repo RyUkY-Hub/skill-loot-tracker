@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
- * All rights reserved.
+ * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
+ *  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,6 +38,7 @@ import javax.inject.Inject;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.Experience;
+import net.runelite.api.GameState;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
@@ -81,6 +83,7 @@ public class SkillLootTrackerPlugin extends Plugin
 
 	private NavigationButton navButton;
 	private Map<Integer, Integer> sessionLoot = new HashMap<>();
+	private Map<Integer, Integer> previousInventory = new HashMap<>();
 	private boolean gatheredItemRecently = false;
 	private SkillLootTracker[] globeCache = new SkillLootTracker[Skill.values().length];
 
@@ -111,7 +114,7 @@ public class SkillLootTrackerPlugin extends Plugin
 
 		clientThread.invokeLater(() ->
 				sessionLoot.forEach((id, qty) ->
-						panel.updateLoot(id, qty, itemManager.getItemPrice(id), getCategory(client.getItemDefinition(id).getName()))
+						panel.updateLoot(id, qty, itemManager.getItemPrice(id), client.getItemDefinition(id).getName())
 				)
 		);
 	}
@@ -149,7 +152,6 @@ public class SkillLootTrackerPlugin extends Plugin
 	public void onChatMessage(ChatMessage event)
 	{
 		String msg = event.getMessage().toLowerCase();
-		// Broaden the check to catch "You get some... logs" or "You catch a... fish"
 		if (msg.contains("you catch") || msg.contains("you get some") || msg.contains("you mine") || msg.contains("you find"))
 		{
 			gatheredItemRecently = true;
@@ -159,34 +161,46 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		if (event.getContainerId() != InventoryID.INVENTORY.getId() || !gatheredItemRecently) return;
+		if (event.getContainerId() != InventoryID.INVENTORY.getId()) return;
 
 		ItemContainer inventory = event.getItemContainer();
+		Map<Integer, Integer> currentInventory = new HashMap<>();
+
 		for (Item item : inventory.getItems())
 		{
-			int id = item.getId();
-			if (id <= 0) continue;
-
-			String name = client.getItemDefinition(id).getName().toLowerCase();
-			String category = getCategory(name);
-
-			if (category == null) continue;
-
-			// FIX: Ignore tools explicitly
-			if (name.contains("axe") || name.contains("harpoon") || name.contains("pickaxe")) continue;
-
-			// FIX: Ensure Woodcutting only tracks logs and Fishing only tracks raw fish
-			if (category.equals("Woodcutting") && !name.contains("logs")) continue;
-			if (category.equals("Fishing") && !name.contains("raw")) continue;
-
-			int total = sessionLoot.getOrDefault(id, 0) + 1;
-			sessionLoot.put(id, total);
-			saveLoot();
-			panel.updateLoot(id, total, itemManager.getItemPrice(id), category);
-
-			gatheredItemRecently = false; // Reset flag so we don't count everything in the bag
-			break;
+			if (item.getId() <= 0) continue;
+			currentInventory.put(item.getId(), currentInventory.getOrDefault(item.getId(), 0) + item.getQuantity());
 		}
+
+		if (gatheredItemRecently)
+		{
+			for (Map.Entry<Integer, Integer> entry : currentInventory.entrySet())
+			{
+				int id = entry.getKey();
+				int currentQty = entry.getValue();
+				int previousQty = previousInventory.getOrDefault(id, 0);
+
+				if (currentQty > previousQty)
+				{
+					String name = client.getItemDefinition(id).getName();
+					String category = getCategory(name);
+
+					if (category != null)
+					{
+						int diff = currentQty - previousQty;
+						int total = sessionLoot.getOrDefault(id, 0) + diff;
+						sessionLoot.put(id, total);
+						saveLoot();
+
+						// FIX: Pass 'name' as the category so each item gets its own box
+						panel.updateLoot(id, total, itemManager.getItemPrice(id) * diff, name);
+					}
+				}
+			}
+			gatheredItemRecently = false;
+		}
+
+		previousInventory = currentInventory;
 	}
 
 	@Subscribe
@@ -224,20 +238,22 @@ public class SkillLootTrackerPlugin extends Plugin
 
 	private String getCategory(String name)
 	{
-		name = name.toLowerCase();
-		if ((name.contains("raw") || name.contains("fish")) && config.trackFishing()) return "Fishing";
-		if (name.contains("logs") && config.trackWoodcutting()) return "Woodcutting";
-		if ((name.contains("ore") || name.contains("gem")) && config.trackMining()) return "Mining";
+		String lowerName = name.toLowerCase();
+		if (lowerName.contains("axe") || lowerName.contains("harpoon") || lowerName.contains("pickaxe")) return null;
+
+		if ((lowerName.contains("raw") || lowerName.contains("fish")) && config.trackFishing()) return "Fishing";
+		if (lowerName.contains("logs") && config.trackWoodcutting()) return "Woodcutting";
+		if ((lowerName.contains("ore") || lowerName.contains("gem") || lowerName.contains("coal")) && config.trackMining()) return "Mining";
 		return null;
 	}
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		if (event.getGameState().equals(net.runelite.api.GameState.LOGGING_IN))
+		if (event.getGameState() == GameState.LOGIN_SCREEN || event.getGameState() == GameState.HOPPING)
 		{
 			xpGlobes.clear();
-			globeCache = new SkillLootTracker[Skill.values().length];
+			previousInventory.clear();
 		}
 	}
 }

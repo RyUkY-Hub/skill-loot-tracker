@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
+ * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
