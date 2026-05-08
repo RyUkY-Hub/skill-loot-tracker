@@ -21,8 +21,6 @@ import net.runelite.client.plugins.xptracker.XpTrackerService;
 import net.runelite.client.ui.overlay.Overlay;
 import static net.runelite.client.ui.overlay.OverlayManager.OPTION_CONFIGURE;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.components.LineComponent;
-import net.runelite.client.ui.overlay.components.PanelComponent;
 import net.runelite.client.ui.overlay.tooltip.Tooltip;
 import net.runelite.client.ui.overlay.tooltip.TooltipManager;
 
@@ -38,8 +36,6 @@ public class SkillLootTrackerOverlay extends Overlay
     private final XpTrackerService xpTrackerService;
     private final TooltipManager tooltipManager;
     private final SkillIconManager iconManager;
-    private final Tooltip xpTooltip = new Tooltip(new PanelComponent());
-
     @Inject
     private SkillLootTrackerOverlay(
             Client client,
@@ -106,12 +102,9 @@ public class SkillLootTrackerOverlay extends Overlay
 
     private void drawTooltip(SkillLootTracker globe)
     {
-        PanelComponent panelComponent = (PanelComponent) xpTooltip.getComponent();
-        panelComponent.getChildren().clear();
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left(globe.getSkill().getName())
-                .right("Level " + globe.getCurrentLevel())
-                .build());
-        tooltipManager.add(xpTooltip);
+        tooltipManager.add(new Tooltip(
+                globe.getSkill().getName()
+                        + " - Level " + globe.getCurrentLevel()
+        ));
     }
 }

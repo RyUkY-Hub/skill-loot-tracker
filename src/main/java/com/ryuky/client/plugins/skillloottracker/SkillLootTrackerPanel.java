@@ -40,6 +40,7 @@ import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.util.QuantityFormatter;
+import javax.swing.ImageIcon;
 
 public class SkillLootTrackerPanel extends PluginPanel
 {
@@ -151,7 +152,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 				iconLabel.setHorizontalTextPosition(SwingConstants.CENTER);
 				iconLabel.setFont(FontManager.getRunescapeSmallFont());
 				iconLabel.setForeground(Color.YELLOW);
-				itemManager.getImage(id, qty, qty > 1).addTo(iconLabel);
+				iconLabel.setIcon(new ImageIcon(itemManager.getImage(id, qty, qty > 1)));
 
 				itemIcons.put(id, iconLabel);
 				itemGrid.add(iconLabel);
