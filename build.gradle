@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group 'net.runelite.client.plugins.skillloottracker'
+group 'com.ryuky.client.plugins.skillloottracker'
 version '1.0.0'
 
 // This section tells the computer where to find RuneLite's code
