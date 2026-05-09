@@ -67,6 +67,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Inject private SkillLootTrackerConfig config;
 	@Inject private OverlayManager overlayManager;
 	@Inject private SkillLootTrackerOverlay overlay;
+	@Inject private Gson gson; // FIXED: Inject client Gson instead of new Gson()
 
 	private NavigationButton navButton;
 
@@ -74,7 +75,6 @@ public class SkillLootTrackerPlugin extends Plugin
 	private Map<Integer, Integer> previousInventory = new HashMap<>();
 	private boolean gatheredItemRecently = false;
 
-	private final Gson gson = new Gson();
 	private final Type lootType = new TypeToken<Map<Integer, Integer>>(){}.getType();
 
 	@Provides
@@ -259,7 +259,8 @@ public class SkillLootTrackerPlugin extends Plugin
 		// Ignore tools
 		if (lower.contains("axe") || lower.contains("harpoon") || lower.contains("pickaxe")
 				|| lower.contains("rod") || lower.contains("hammer") || lower.contains("chisel")
-				|| lower.contains("knife") || lower.contains("tinderbox"))
+				|| lower.contains("knife") || lower.contains("tinderbox") || lower.contains("net")
+				|| lower.contains("cage") || lower.contains("pot"))
 		{
 			return null;
 		}
@@ -270,7 +271,8 @@ public class SkillLootTrackerPlugin extends Plugin
 				|| lower.contains("karambwan") || lower.contains("monkfish") || lower.contains("anglerfish") || lower.contains("dark crab")
 				|| lower.contains("bass") || lower.contains("cod") || lower.contains("mackerel") || lower.contains("herring")
 				|| lower.contains("pike") || lower.contains("salmon") || lower.contains("trout") || lower.contains("cavefish")
-				|| lower.contains("cave eel") || lower.contains("slimy eel") || lower.contains("lava eel"))
+				|| lower.contains("cave eel") || lower.contains("slimy eel") || lower.contains("lava eel")
+				|| lower.contains("casket") || lower.contains("oyster") || lower.contains("seaweed"))
 				&& config.trackFishing())
 		{
 			return "Fishing";
@@ -309,11 +311,13 @@ public class SkillLootTrackerPlugin extends Plugin
 				|| lower.equals("clay") || lower.equals("limestone") || lower.equals("sandstone")
 				|| lower.contains("uncut") || lower.contains("sapphire") || lower.contains("emerald")
 				|| lower.contains("ruby") || lower.contains("diamond") || lower.contains("dragonstone")
+				|| lower.contains("onyx") || lower.contains("zenyte")
 				|| lower.equals("gold") || lower.equals("silver") || lower.contains("mithril")
 				|| lower.contains("adamantite") || lower.contains("runite") || lower.contains("iron")
 				|| lower.contains("copper") || lower.contains("tin") || lower.contains("blurite")
 				|| lower.contains("elemental") || lower.contains("daeyalt") || lower.contains("lunar")
-				|| lower.contains("volcanic") || lower.contains("pay-dirt") || lower.contains("amethyst"))
+				|| lower.contains("volcanic") || lower.contains("pay-dirt") || lower.contains("amethyst")
+				|| lower.contains("dense essence"))
 				&& config.trackMining())
 		{
 			return "Mining";
