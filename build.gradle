@@ -5,38 +5,33 @@ plugins {
 group 'com.ryuky.client.plugins.skillloottracker'
 version '1.0.0'
 
-// This section tells the computer where to find RuneLite's code
 repositories {
     mavenLocal()
     mavenCentral()
     maven {
-        url = 'https://runelite.net'
+        url = 'https://repo.runelite.net'
     }
 }
 
-def runeliteVersion = '1.10.33' // Update this to the current RuneLite version if needed
+def runeliteVersion = 'latest.release'
 
 dependencies {
-    // These are the "libraries" your plugin needs to work
     compileOnly group: 'net.runelite', name: 'api', version: runeliteVersion
     compileOnly group: 'net.runelite', name: 'client', version: runeliteVersion
-    
-    // Lombok handles your @Getter and @Setter
+
+    // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.30'
     annotationProcessor 'org.projectlombok:lombok:1.18.30'
 
-    // Google Guice handles the @Inject
-    compileOnly 'com.google.inject:guice:6.0.0'
-
-    // GSON handles the JSON saving/loading
+    // GSON
     compileOnly 'com.google.code.gson:gson:2.10.1'
 
-    // Testing tools for your PluginLuncher
+    // Testing
     testImplementation group: 'net.runelite', name: 'api', version: runeliteVersion
     testImplementation group: 'net.runelite', name: 'client', version: runeliteVersion
 }
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
-    options.release = 11 // RuneLite currently uses Java 11 for plugins
+    options.release = 11
 }

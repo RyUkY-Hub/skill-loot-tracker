@@ -1,16 +1,15 @@
 /*
  * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
  * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
- *  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -25,30 +24,28 @@
  */
 package com.ryuky.client.plugins.skillloottracker;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.GridLayout;
-import java.util.HashMap;
-import java.util.Map;
-import javax.inject.Inject;
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.SwingConstants;
-import javax.swing.border.EmptyBorder;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
+import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.QuantityFormatter;
-import javax.swing.ImageIcon;
+
+import javax.inject.Inject;
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SkillLootTrackerPanel extends PluginPanel
 {
 	private final Map<String, LootBox> boxes = new HashMap<>();
 	private final JPanel container = new JPanel();
-	private final JLabel totalValueLabel = new JLabel("0 gp");
-	private long totalSessionValue = 0;
+	private final JLabel totalValueLabel = new JLabel("Total: 0 gp");
+	private final ExecutorService iconLoader = Executors.newSingleThreadExecutor();
 
 	@Inject
 	private ItemManager itemManager;
@@ -75,34 +72,42 @@ public class SkillLootTrackerPanel extends PluginPanel
 		header.add(resetBtn, BorderLayout.EAST);
 		add(header, BorderLayout.NORTH);
 
-		container.setLayout(new GridLayout(0, 1, 0, 10));
+		container.setLayout(new GridLayout(0, 1, 0, 5));
 		container.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		container.setBorder(new EmptyBorder(5, 5, 5, 5));
 		add(container, BorderLayout.CENTER);
 	}
 
-	public void updateLoot(int itemId, int totalAmount, int itemPrice, String category)
+	public void updateLoot(int itemId, int totalAmount, int valueAdded, String category)
 	{
-		LootBox box = boxes.computeIfAbsent(category, k -> {
+		LootBox box = boxes.computeIfAbsent(category, k ->
+		{
 			LootBox newBox = new LootBox(k);
 			container.add(newBox);
 			return newBox;
 		});
 
-		box.updateItem(itemId, totalAmount, itemPrice);
+		box.updateItem(itemId, totalAmount);
 
-		totalSessionValue += itemPrice;
-		totalValueLabel.setText("Total: " + QuantityFormatter.quantityToStackSize(totalSessionValue) + " gp");
-
+		recalculateTotals();
 		repaint();
 		revalidate();
+	}
+
+	private void recalculateTotals()
+	{
+		long totalSessionValue = boxes.values().stream()
+				.mapToLong(LootBox::getBoxValue)
+				.sum();
+
+		totalValueLabel.setText("Total: " + QuantityFormatter.quantityToStackSize(totalSessionValue) + " gp");
 	}
 
 	public void resetAll()
 	{
 		boxes.clear();
 		container.removeAll();
-		totalSessionValue = 0;
-		totalValueLabel.setText("0 gp");
+		totalValueLabel.setText("Total: 0 gp");
 		repaint();
 		revalidate();
 	}
@@ -112,7 +117,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 		private final JPanel itemGrid = new JPanel(new GridLayout(0, 5, 2, 2));
 		private final JLabel subtotalLabel = new JLabel("0 gp");
 		private final Map<Integer, JLabel> itemIcons = new HashMap<>();
-		private long boxValue = 0;
+		private final Map<Integer, Integer> itemQtys = new HashMap<>();
 
 		LootBox(String title)
 		{
@@ -121,11 +126,12 @@ public class SkillLootTrackerPanel extends PluginPanel
 			setBorder(new EmptyBorder(5, 5, 5, 5));
 
 			JLabel titleLabel = new JLabel(title);
-			titleLabel.setFont(FontManager.getRunescapeSmallFont());
+			titleLabel.setFont(FontManager.getRunescapeBoldFont());
 			titleLabel.setForeground(ColorScheme.PROGRESS_COMPLETE_COLOR);
 
 			subtotalLabel.setFont(FontManager.getRunescapeSmallFont());
 			subtotalLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+			subtotalLabel.setForeground(Color.WHITE);
 
 			JPanel topPart = new JPanel(new BorderLayout());
 			topPart.setOpaque(false);
@@ -137,27 +143,60 @@ public class SkillLootTrackerPanel extends PluginPanel
 			add(itemGrid, BorderLayout.CENTER);
 		}
 
-		void updateItem(int id, int qty, int price)
+		void updateItem(int id, int qty)
 		{
-			boxValue += price;
+			itemQtys.put(id, qty);
+
+			long boxValue = getBoxValue();
 			subtotalLabel.setText(QuantityFormatter.quantityToStackSize(boxValue) + " gp");
 
-			if (itemIcons.containsKey(id))
+			JLabel iconLabel = itemIcons.get(id);
+			if (iconLabel != null)
 			{
-				itemIcons.get(id).setText(QuantityFormatter.quantityToStackSize(qty));
+				iconLabel.setText(QuantityFormatter.quantityToStackSize(qty));
+				updateTooltip(iconLabel, id, qty);
 			}
 			else
 			{
-				JLabel iconLabel = new JLabel(QuantityFormatter.quantityToStackSize(qty));
+				iconLabel = new JLabel(QuantityFormatter.quantityToStackSize(qty));
 				iconLabel.setVerticalTextPosition(SwingConstants.BOTTOM);
 				iconLabel.setHorizontalTextPosition(SwingConstants.CENTER);
 				iconLabel.setFont(FontManager.getRunescapeSmallFont());
 				iconLabel.setForeground(Color.YELLOW);
-				iconLabel.setIcon(new ImageIcon(itemManager.getImage(id, qty, qty > 1)));
+
+				updateTooltip(iconLabel, id, qty);
+
+				final JLabel finalIconLabel = iconLabel;
+				iconLoader.submit(() ->
+				{
+					BufferedImage img = itemManager.getImage(id, qty, qty > 1);
+					SwingUtilities.invokeLater(() -> finalIconLabel.setIcon(new ImageIcon(img)));
+				});
 
 				itemIcons.put(id, iconLabel);
 				itemGrid.add(iconLabel);
 			}
+		}
+
+		private void updateTooltip(JLabel label, int itemId, int qty)
+		{
+			String itemName = itemManager.getItemComposition(itemId).getName();
+			long itemPrice = itemManager.getItemPrice(itemId);
+			long totalPrice = itemPrice * qty;
+
+			String tooltip = String.format("<html>%s<br>GE Value: %s gp<br>Total: %s gp</html>",
+					itemName,
+					QuantityFormatter.quantityToStackSize(itemPrice),
+					QuantityFormatter.quantityToStackSize(totalPrice));
+
+			label.setToolTipText(tooltip);
+		}
+
+		long getBoxValue()
+		{
+			return itemQtys.entrySet().stream()
+					.mapToLong(e -> (long) itemManager.getItemPrice(e.getKey()) * e.getValue())
+					.sum();
 		}
 	}
 }

@@ -1,16 +1,15 @@
 /*
  * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
  * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
- *  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -24,29 +23,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.ryuky.client.plugins.skillloottracker;
-
-import java.awt.image.BufferedImage;
-import java.time.Instant;
-import lombok.Getter;
-import lombok.Setter;
-import net.runelite.api.Skill;
-
-@Getter
-@Setter
 public class SkillLootTracker
 {
-	private Skill skill;
-	private int currentXp;
-	private int currentLevel;
-	private Instant time;
-	private int size;
-	private BufferedImage skillIcon;
-
-	SkillLootTracker(Skill skill, int currentXp, int currentLevel, Instant time)
-	{
-		this.skill = skill;
-		this.currentXp = currentXp;
-		this.currentLevel = currentLevel;
-		this.time = time;
-	}
 }

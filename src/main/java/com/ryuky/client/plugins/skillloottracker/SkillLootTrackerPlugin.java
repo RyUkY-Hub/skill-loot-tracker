@@ -1,16 +1,15 @@
 /*
  * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
  * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
- *  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -28,48 +27,37 @@ package com.ryuky.client.plugins.skillloottracker;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.google.inject.Provides;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import javax.inject.Inject;
-import lombok.Getter;
-import net.runelite.api.Client;
-import net.runelite.api.Experience;
-import net.runelite.api.GameState;
-import net.runelite.api.InventoryID;
-import net.runelite.api.Item;
-import net.runelite.api.ItemContainer;
-import net.runelite.api.Skill;
+import net.runelite.api.*;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
-import net.runelite.api.events.StatChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
-import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.xptracker.XpTrackerPlugin;
-import net.runelite.client.task.Schedule;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ImageUtil;
 
+import javax.inject.Inject;
+import java.lang.reflect.Type;
+import java.util.HashMap;
+import java.util.Map;
+
 @PluginDescriptor(
 		name = "Skilling Loot Tracker",
-		description = "Tracks skilling loot and shows XP globes",
-		tags = {"experience", "levels", "loot", "fishing", "mining", "woodcutting"},
+		description = "Tracks skilling loot from Fishing, Mining, and Woodcutting",
+		tags = {"loot", "fishing", "mining", "woodcutting"},
 		enabledByDefault = true
 )
-@PluginDependency(XpTrackerPlugin.class)
 public class SkillLootTrackerPlugin extends Plugin
 {
+	private static final String CONFIG_GROUP = "skillloottracker";
+	private static final String CONFIG_KEY_LOOT = "lootData";
+
 	@Inject private Client client;
 	@Inject private ClientThread clientThread;
 	@Inject private ClientToolbar clientToolbar;
@@ -79,16 +67,15 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Inject private SkillLootTrackerConfig config;
 	@Inject private OverlayManager overlayManager;
 	@Inject private SkillLootTrackerOverlay overlay;
-	@Inject private Gson gson;
 
 	private NavigationButton navButton;
+
 	private Map<Integer, Integer> sessionLoot = new HashMap<>();
 	private Map<Integer, Integer> previousInventory = new HashMap<>();
 	private boolean gatheredItemRecently = false;
-	private SkillLootTracker[] globeCache = new SkillLootTracker[Skill.values().length];
 
-	@Getter
-	private final List<SkillLootTracker> xpGlobes = new ArrayList<>();
+	private final Gson gson = new Gson();
+	private final Type lootType = new TypeToken<Map<Integer, Integer>>(){}.getType();
 
 	@Provides
 	SkillLootTrackerConfig getConfig(ConfigManager configManager)
@@ -101,6 +88,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	{
 		panel.init(this::resetTracker);
 		loadLoot();
+
 		overlayManager.add(overlay);
 
 		navButton = NavigationButton.builder()
@@ -112,11 +100,10 @@ public class SkillLootTrackerPlugin extends Plugin
 
 		clientToolbar.addNavigation(navButton);
 
-		clientThread.invokeLater(() ->
-				sessionLoot.forEach((id, qty) ->
-						panel.updateLoot(id, qty, itemManager.getItemPrice(id), client.getItemDefinition(id).getName())
-				)
-		);
+		if (client.getGameState() == GameState.LOGGED_IN)
+		{
+			clientThread.invokeLater(this::populatePanelFromSave);
+		}
 	}
 
 	@Override
@@ -124,7 +111,6 @@ public class SkillLootTrackerPlugin extends Plugin
 	{
 		overlayManager.remove(overlay);
 		clientToolbar.removeNavigation(navButton);
-		xpGlobes.clear();
 	}
 
 	private void resetTracker()
@@ -136,23 +122,77 @@ public class SkillLootTrackerPlugin extends Plugin
 
 	private void saveLoot()
 	{
-		configManager.setConfiguration("skillloottracker", "lootData", gson.toJson(sessionLoot));
+		String json = gson.toJson(sessionLoot);
+		configManager.setConfiguration(CONFIG_GROUP, CONFIG_KEY_LOOT, json);
 	}
 
 	private void loadLoot()
 	{
-		String json = configManager.getConfiguration("skillloottracker", "lootData");
-		if (json != null && !json.isEmpty())
+		String json = configManager.getConfiguration(CONFIG_GROUP, CONFIG_KEY_LOOT);
+		if (json == null || json.isEmpty())
 		{
-			sessionLoot = gson.fromJson(json, new TypeToken<Map<Integer, Integer>>(){}.getType());
+			sessionLoot = new HashMap<>();
 		}
+		else
+		{
+			try
+			{
+				sessionLoot = gson.fromJson(json, lootType);
+			}
+			catch (Exception e)
+			{
+				sessionLoot = new HashMap<>();
+			}
+		}
+	}
+
+	private void populatePanelFromSave()
+	{
+		sessionLoot.forEach((id, qty) ->
+		{
+			ItemComposition comp = itemManager.getItemComposition(id);
+			String category = getCategory(id, comp.getName());
+			if (category != null)
+			{
+				int value = itemManager.getItemPrice(id) * qty;
+				panel.updateLoot(id, qty, value, category);
+			}
+		});
 	}
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event)
 	{
+		if (event.getType() != ChatMessageType.SPAM && event.getType() != ChatMessageType.GAMEMESSAGE)
+		{
+			return;
+		}
+
 		String msg = event.getMessage().toLowerCase();
-		if (msg.contains("you catch") || msg.contains("you get some") || msg.contains("you mine") || msg.contains("you find"))
+
+		// Fishing
+		if (msg.contains("you catch")
+				|| msg.contains("you catch a")
+				|| msg.contains("you catch some")
+				|| msg.contains("you snag"))
+		{
+			gatheredItemRecently = true;
+		}
+		// Mining
+		else if (msg.contains("you swing your pick")
+				|| msg.contains("you manage to mine")
+				|| msg.contains("you just mined")
+				|| msg.contains("you mine some")
+				|| msg.contains("you mine"))
+		{
+			gatheredItemRecently = true;
+		}
+		// Woodcutting
+		else if (msg.contains("you get some")
+				|| msg.contains("you chop")
+				|| msg.contains("you cut")
+				|| msg.contains("you chop away")
+				|| msg.contains("you get logs"))
 		{
 			gatheredItemRecently = true;
 		}
@@ -161,15 +201,24 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		if (event.getContainerId() != InventoryID.INVENTORY.getId()) return;
+		if (event.getContainerId() != InventoryID.INVENTORY.getId())
+		{
+			return;
+		}
 
 		ItemContainer inventory = event.getItemContainer();
 		Map<Integer, Integer> currentInventory = new HashMap<>();
 
 		for (Item item : inventory.getItems())
 		{
-			if (item.getId() <= 0) continue;
-			currentInventory.put(item.getId(), currentInventory.getOrDefault(item.getId(), 0) + item.getQuantity());
+			if (item.getId() <= 0)
+			{
+				continue;
+			}
+
+			ItemComposition comp = itemManager.getItemComposition(item.getId());
+			int id = comp.getNote() != -1 ? comp.getNote() : item.getId();
+			currentInventory.merge(id, item.getQuantity(), Integer::sum);
 		}
 
 		if (gatheredItemRecently)
@@ -182,77 +231,107 @@ public class SkillLootTrackerPlugin extends Plugin
 
 				if (currentQty > previousQty)
 				{
-					String name = client.getItemDefinition(id).getName();
-					String category = getCategory(name);
+					int diff = currentQty - previousQty;
+					ItemComposition comp = itemManager.getItemComposition(id);
+					String category = getCategory(id, comp.getName());
 
 					if (category != null)
 					{
-						int diff = currentQty - previousQty;
-						int total = sessionLoot.getOrDefault(id, 0) + diff;
-						sessionLoot.put(id, total);
+						int total = sessionLoot.merge(id, diff, Integer::sum);
 						saveLoot();
 
-						// FIX: Pass 'name' as the category so each item gets its own box
-						panel.updateLoot(id, total, itemManager.getItemPrice(id) * diff, name);
+						int valueAdded = itemManager.getItemPrice(id) * diff;
+						panel.updateLoot(id, total, valueAdded, category);
 					}
 				}
 			}
+
 			gatheredItemRecently = false;
 		}
 
 		previousInventory = currentInventory;
 	}
 
-	@Subscribe
-	public void onStatChanged(StatChanged statChanged)
+	private String getCategory(int itemId, String name)
 	{
-		Skill skill = statChanged.getSkill();
-		int currentXp = statChanged.getXp();
-		int currentLevel = statChanged.getLevel();
-		int skillIdx = skill.ordinal();
-		SkillLootTracker cachedGlobe = globeCache[skillIdx];
+		String lower = name.toLowerCase();
 
-		if (cachedGlobe != null && (cachedGlobe.getCurrentXp() >= currentXp)) return;
-
-		if (currentLevel >= Experience.MAX_REAL_LEVEL) currentLevel = Experience.getLevelForXp(currentXp);
-
-		if (cachedGlobe != null)
+		// Ignore tools
+		if (lower.contains("axe") || lower.contains("harpoon") || lower.contains("pickaxe")
+				|| lower.contains("rod") || lower.contains("hammer") || lower.contains("chisel")
+				|| lower.contains("knife") || lower.contains("tinderbox"))
 		{
-			cachedGlobe.setCurrentXp(currentXp);
-			cachedGlobe.setCurrentLevel(currentLevel);
-			cachedGlobe.setTime(Instant.now());
-			if (!xpGlobes.contains(cachedGlobe)) xpGlobes.add(cachedGlobe);
+			return null;
 		}
-		else
+
+		// Fishing
+		if ((lower.contains("raw") || lower.contains("fish") || lower.contains("squid") || lower.contains("manta")
+				|| lower.contains("shark") || lower.contains("lobster") || lower.contains("tuna") || lower.contains("swordfish")
+				|| lower.contains("karambwan") || lower.contains("monkfish") || lower.contains("anglerfish") || lower.contains("dark crab")
+				|| lower.contains("bass") || lower.contains("cod") || lower.contains("mackerel") || lower.contains("herring")
+				|| lower.contains("pike") || lower.contains("salmon") || lower.contains("trout") || lower.contains("cavefish")
+				|| lower.contains("cave eel") || lower.contains("slimy eel") || lower.contains("lava eel"))
+				&& config.trackFishing())
 		{
-			globeCache[skillIdx] = new SkillLootTracker(skill, currentXp, currentLevel, Instant.now());
+			return "Fishing";
 		}
-	}
 
-	@Schedule(period = 1, unit = ChronoUnit.SECONDS)
-	public void removeExpiredXpGlobes()
-	{
-		Instant expireTime = Instant.now().minusSeconds(config.xpOrbDuration());
-		xpGlobes.removeIf(globe -> globe.getTime().isBefore(expireTime));
-	}
+		// Woodcutting - ALL LOG TYPES
+		if ((lower.equals("logs")
+				|| lower.equals("oak logs")
+				|| lower.equals("willow logs")
+				|| lower.equals("teak logs")
+				|| lower.equals("maple logs")
+				|| lower.equals("mahogany logs")
+				|| lower.equals("yew logs")
+				|| lower.equals("magic logs")
+				|| lower.equals("redwood logs")
+				|| lower.equals("achey tree logs")
+				|| lower.equals("arctic pine logs")
+				|| lower.equals("eucalyptus logs")
+				|| lower.equals("blisterwood logs")
+				|| lower.equals("bloodbark logs")
+				|| lower.equals("pyre logs")
+				|| lower.equals("oak pyre logs")
+				|| lower.equals("willow pyre logs")
+				|| lower.equals("maple pyre logs")
+				|| lower.equals("yew pyre logs")
+				|| lower.equals("magic pyre logs")
+				|| lower.equals("redwood pyre logs"))
+				&& config.trackWoodcutting())
+		{
+			return "Woodcutting";
+		}
 
-	private String getCategory(String name)
-	{
-		String lowerName = name.toLowerCase();
-		if (lowerName.contains("axe") || lowerName.contains("harpoon") || lowerName.contains("pickaxe")) return null;
+		// Mining
+		if ((lower.contains("ore") || lower.contains("gem") || lower.equals("coal")
+				|| lower.contains("rune essence") || lower.contains("pure essence")
+				|| lower.equals("clay") || lower.equals("limestone") || lower.equals("sandstone")
+				|| lower.contains("uncut") || lower.contains("sapphire") || lower.contains("emerald")
+				|| lower.contains("ruby") || lower.contains("diamond") || lower.contains("dragonstone")
+				|| lower.equals("gold") || lower.equals("silver") || lower.contains("mithril")
+				|| lower.contains("adamantite") || lower.contains("runite") || lower.contains("iron")
+				|| lower.contains("copper") || lower.contains("tin") || lower.contains("blurite")
+				|| lower.contains("elemental") || lower.contains("daeyalt") || lower.contains("lunar")
+				|| lower.contains("volcanic") || lower.contains("pay-dirt") || lower.contains("amethyst"))
+				&& config.trackMining())
+		{
+			return "Mining";
+		}
 
-		if ((lowerName.contains("raw") || lowerName.contains("fish")) && config.trackFishing()) return "Fishing";
-		if (lowerName.contains("logs") && config.trackWoodcutting()) return "Woodcutting";
-		if ((lowerName.contains("ore") || lowerName.contains("gem") || lowerName.contains("coal")) && config.trackMining()) return "Mining";
 		return null;
 	}
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
+		if (event.getGameState() == GameState.LOGGED_IN)
+		{
+			clientThread.invokeLater(this::populatePanelFromSave);
+		}
+
 		if (event.getGameState() == GameState.LOGIN_SCREEN || event.getGameState() == GameState.HOPPING)
 		{
-			xpGlobes.clear();
 			previousInventory.clear();
 		}
 	}

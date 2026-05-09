@@ -1,16 +1,15 @@
 /*
  * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
  * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -24,54 +23,40 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.ryuky.client.plugins.skillloottracker;
-
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
-import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup("skillloottracker")
 public interface SkillLootTrackerConfig extends Config
 {
-	@ConfigSection(
-			name = "Skill Tracking",
-			description = "Enable tracking for specific skills",
-			position = 0
-	)
-	String skillSection = "skills";
-
 	@ConfigItem(
 			keyName = "trackFishing",
 			name = "Track Fishing",
-			description = "Track items gathered from fishing",
-			section = skillSection,
-			position = 1
+			description = "Track fish and other fishing loot"
 	)
-	default boolean trackFishing() { return true; }
+	default boolean trackFishing()
+	{
+		return true;
+	}
 
 	@ConfigItem(
 			keyName = "trackWoodcutting",
 			name = "Track Woodcutting",
-			description = "Track items gathered from woodcutting",
-			section = skillSection,
-			position = 2
+			description = "Track logs from woodcutting"
 	)
-	default boolean trackWoodcutting() { return true; }
+	default boolean trackWoodcutting()
+	{
+		return true;
+	}
 
 	@ConfigItem(
 			keyName = "trackMining",
 			name = "Track Mining",
-			description = "Track items gathered from mining",
-			section = skillSection,
-			position = 3
+			description = "Track ores and gems from mining"
 	)
-	default boolean trackMining() { return true; }
-
-	@ConfigItem(
-			keyName = "xpOrbDuration",
-			name = "Orb Duration",
-			description = "How long the XP globes stay on screen (seconds)",
-			position = 4
-	)
-	default int xpOrbDuration() { return 10; }
+	default boolean trackMining()
+	{
+		return true;
+	}
 }
