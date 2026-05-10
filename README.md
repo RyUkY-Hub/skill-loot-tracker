@@ -10,4 +10,4 @@ Features:
 - Session value tracking
 - Per-skill loot categorization
 
-Built for RuneLite Plugin Hub.
+Built for RuneLite Plugin Hub. 
