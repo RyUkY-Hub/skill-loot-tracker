@@ -24,6 +24,7 @@
  */
 package com.ryuky.client.plugins.skillloottracker;
 
+import net.runelite.api.ItemComposition;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
@@ -75,7 +76,43 @@ public class SkillLootTrackerPanel extends PluginPanel
 		container.setLayout(new GridLayout(0, 1, 0, 5));
 		container.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		container.setBorder(new EmptyBorder(5, 5, 5, 5));
-		add(container, BorderLayout.CENTER);
+
+		// Create scroll pane
+		JScrollPane scrollPane = new JScrollPane(container);
+		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+		scrollPane.setBorder(null);
+		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
+		// Theme the scrollbar to match RuneLite - put it here
+		scrollPane.getVerticalScrollBar().setUI(new javax.swing.plaf.basic.BasicScrollBarUI() {
+			@Override
+			protected void configureScrollBarColors() {
+				this.thumbColor = ColorScheme.DARKER_GRAY_COLOR;
+				this.trackColor = ColorScheme.DARK_GRAY_COLOR;
+			}
+
+			@Override
+			protected JButton createDecreaseButton(int orientation) {
+				return createZeroButton();
+			}
+
+			@Override
+			protected JButton createIncreaseButton(int orientation) {
+				return createZeroButton();
+			}
+
+			private JButton createZeroButton() {
+				JButton button = new JButton();
+				button.setPreferredSize(new Dimension(0, 0));
+				button.setMinimumSize(new Dimension(0, 0));
+				button.setMaximumSize(new Dimension(0, 0));
+				return button;
+			}
+		});
+
+		add(scrollPane, BorderLayout.CENTER);
 	}
 
 	public void updateLoot(int itemId, int totalAmount, int valueAdded, String category)
@@ -83,9 +120,13 @@ public class SkillLootTrackerPanel extends PluginPanel
 		LootBox box = boxes.computeIfAbsent(category, k ->
 		{
 			LootBox newBox = new LootBox(k);
-			container.add(newBox);
+			container.add(newBox); // initially adds to bottom
 			return newBox;
 		});
+
+		// Move this box to the top
+		container.remove(box);
+		container.add(box, 0); // 0 = first position
 
 		box.updateItem(itemId, totalAmount);
 
@@ -99,8 +140,19 @@ public class SkillLootTrackerPanel extends PluginPanel
 		long totalSessionValue = boxes.values().stream()
 				.mapToLong(LootBox::getBoxValue)
 				.sum();
+		long totalSessionHa = boxes.values().stream()
+				.mapToLong(LootBox::getBoxHaValue)
+				.sum();
 
-		totalValueLabel.setText("Total: " + QuantityFormatter.quantityToStackSize(totalSessionValue) + " gp");
+		if (totalSessionHa > 0)
+		{
+			totalValueLabel.setText(String.format("Total: %s gp",
+					QuantityFormatter.quantityToStackSize(totalSessionValue)));
+		}
+		else
+		{
+			totalValueLabel.setText("Total: " + QuantityFormatter.quantityToStackSize(totalSessionValue) + " gp");
+		}
 	}
 
 	public void resetAll()
@@ -110,6 +162,11 @@ public class SkillLootTrackerPanel extends PluginPanel
 		totalValueLabel.setText("Total: 0 gp");
 		repaint();
 		revalidate();
+	}
+
+	public void shutdown()
+	{
+		iconLoader.shutdown();
 	}
 
 	private class LootBox extends JPanel
@@ -148,7 +205,17 @@ public class SkillLootTrackerPanel extends PluginPanel
 			itemQtys.put(id, qty);
 
 			long boxValue = getBoxValue();
-			subtotalLabel.setText(QuantityFormatter.quantityToStackSize(boxValue) + " gp");
+			long boxHaValue = getBoxHaValue();
+			if (boxHaValue > 0)
+			{
+				subtotalLabel.setText(String.format("<html><font color=#00FF00>GE: %s gp</font> | <font color=#FFFF00>HA: %s gp</font></html>",
+						QuantityFormatter.quantityToStackSize(boxValue),
+						QuantityFormatter.quantityToStackSize(boxHaValue)));
+			}
+			else
+			{
+				subtotalLabel.setText(QuantityFormatter.quantityToStackSize(boxValue) + " gp");
+			}
 
 			JLabel iconLabel = itemIcons.get(id);
 			if (iconLabel != null)
@@ -169,7 +236,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 				final JLabel finalIconLabel = iconLabel;
 				iconLoader.submit(() ->
 				{
-					BufferedImage img = itemManager.getImage(id, qty, qty > 1);
+					BufferedImage img = itemManager.getImage(id, 1, false);
 					SwingUtilities.invokeLater(() -> finalIconLabel.setIcon(new ImageIcon(img)));
 				});
 
@@ -180,22 +247,44 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 		private void updateTooltip(JLabel label, int itemId, int qty)
 		{
-			String itemName = itemManager.getItemComposition(itemId).getName();
-			long itemPrice = itemManager.getItemPrice(itemId);
-			long totalPrice = itemPrice * qty;
+			ItemComposition comp = itemManager.getItemComposition(itemId);
+			String itemName = comp.getName();
 
-			String tooltip = String.format("<html>%s<br>GE Value: %s gp<br>Total: %s gp</html>",
-					itemName,
-					QuantityFormatter.quantityToStackSize(itemPrice),
-					QuantityFormatter.quantityToStackSize(totalPrice));
+			long gePrice = itemManager.getItemPrice(itemId);
+			long haPrice = comp.getHaPrice();
 
-			label.setToolTipText(tooltip);
+			long geTotal = gePrice * qty;
+			long haTotal = haPrice * qty;
+
+			StringBuilder sb = new StringBuilder("<html>");
+			sb.append(itemName).append(" x ").append(QuantityFormatter.quantityToStackSize(qty)).append("<br>");
+			sb.append("GE: ").append(QuantityFormatter.quantityToStackSize(gePrice)).append(" gp<br>");
+			sb.append("GE Total: ").append(QuantityFormatter.quantityToStackSize(geTotal)).append(" gp");
+
+			if (haPrice > 0)
+			{
+				sb.append("<br>HA: ").append(QuantityFormatter.quantityToStackSize(haPrice)).append(" gp");
+				sb.append("<br>HA Total: ").append(QuantityFormatter.quantityToStackSize(haTotal)).append(" gp");
+			}
+
+			sb.append("</html>");
+			label.setToolTipText(sb.toString());
 		}
 
 		long getBoxValue()
 		{
 			return itemQtys.entrySet().stream()
 					.mapToLong(e -> (long) itemManager.getItemPrice(e.getKey()) * e.getValue())
+					.sum();
+		}
+
+		long getBoxHaValue()
+		{
+			return itemQtys.entrySet().stream()
+					.mapToLong(e -> {
+						ItemComposition comp = itemManager.getItemComposition(e.getKey());
+						return (long) comp.getHaPrice() * e.getValue();
+					})
 					.sum();
 		}
 	}

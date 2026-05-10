@@ -260,7 +260,8 @@ public class SkillLootTrackerPlugin extends Plugin
 		if (lower.contains("axe") || lower.contains("harpoon") || lower.contains("pickaxe")
 				|| lower.contains("rod") || lower.contains("hammer") || lower.contains("chisel")
 				|| lower.contains("knife") || lower.contains("tinderbox") || lower.contains("net")
-				|| lower.contains("cage") || lower.contains("pot"))
+				|| lower.contains("cage") || lower.contains("pot") || lower.contains("sextant")
+				|| lower.contains("spyglass") || lower.contains("big net") || lower.contains("lobster pot"))
 		{
 			return null;
 		}
@@ -272,7 +273,20 @@ public class SkillLootTrackerPlugin extends Plugin
 				|| lower.contains("bass") || lower.contains("cod") || lower.contains("mackerel") || lower.contains("herring")
 				|| lower.contains("pike") || lower.contains("salmon") || lower.contains("trout") || lower.contains("cavefish")
 				|| lower.contains("cave eel") || lower.contains("slimy eel") || lower.contains("lava eel")
-				|| lower.contains("casket") || lower.contains("oyster") || lower.contains("seaweed"))
+				|| lower.contains("casket") || lower.contains("oyster") || lower.contains("seaweed")
+				|| lower.contains("sunfish")
+				|| lower.contains("jellyfish")
+				|| lower.contains("great white")
+				|| lower.contains("sea turtle")
+				|| lower.contains("minnow")
+				|| lower.contains("leaping")
+				|| lower.contains("baron shark")
+				|| lower.contains("rainbow fish")
+				|| lower.contains("bluegill")
+				|| lower.contains("pearl")
+				|| lower.contains("molch pearl")
+				|| lower.contains("giant seaweed")
+				|| lower.contains("fossil"))
 				&& config.trackFishing())
 		{
 			return "Fishing";
@@ -293,13 +307,24 @@ public class SkillLootTrackerPlugin extends Plugin
 				|| lower.equals("eucalyptus logs")
 				|| lower.equals("blisterwood logs")
 				|| lower.equals("bloodbark logs")
+				// Varlamore trees - new/working on
+				|| lower.equals("ironwood logs")
+				|| lower.equals("camphor logs")
+				|| lower.equals("jatoba logs")
+				// Pyre logs
 				|| lower.equals("pyre logs")
 				|| lower.equals("oak pyre logs")
 				|| lower.equals("willow pyre logs")
 				|| lower.equals("maple pyre logs")
 				|| lower.equals("yew pyre logs")
 				|| lower.equals("magic pyre logs")
-				|| lower.equals("redwood pyre logs"))
+				|| lower.equals("redwood pyre logs")
+				// Other WC drops
+				|| lower.equals("bird nest")
+				|| lower.contains("nest")
+				|| lower.equals("bark")
+				|| lower.contains("sap")
+				|| lower.contains("crystal shard"))
 				&& config.trackWoodcutting())
 		{
 			return "Woodcutting";
@@ -317,7 +342,23 @@ public class SkillLootTrackerPlugin extends Plugin
 				|| lower.contains("copper") || lower.contains("tin") || lower.contains("blurite")
 				|| lower.contains("elemental") || lower.contains("daeyalt") || lower.contains("lunar")
 				|| lower.contains("volcanic") || lower.contains("pay-dirt") || lower.contains("amethyst")
-				|| lower.contains("dense essence"))
+				|| lower.contains("dense essence")
+				// Varlamore / new ores - new/working on
+				|| lower.contains("lead ore")
+				|| lower.equals("lead")
+				|| lower.contains("calcified rock")
+				|| lower.contains("moonstone")
+				|| lower.contains("salt")
+				|| lower.contains("te salt")
+				|| lower.contains("efh salt")
+				|| lower.contains("urt salt")
+				|| lower.contains("basalt")
+				|| lower.contains("geode")
+				|| lower.contains("golden nugget")
+				|| lower.contains("unidentified mineral")
+				|| lower.contains("fossil")
+				|| lower.contains("granite")
+				|| lower.contains("star fragment"))
 				&& config.trackMining())
 		{
 			return "Mining";
