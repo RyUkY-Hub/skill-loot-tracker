@@ -1,9 +1,11 @@
 plugins {
     id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1' // for shading, needed for plugins
+    id 'net.runelite' version 'latest.release' // this gives you the runelite{} block
 }
 
 group 'com.ryuky.client.plugins.skillloottracker'
-version '1.0.0'
+version '1.5.0'
 
 repositories {
     mavenLocal()
@@ -14,6 +16,11 @@ repositories {
 }
 
 def runeliteVersion = 'latest.release'
+
+// This is the block you need for the icon
+runelite {
+    iconPath = "icon.png"  // file must be in src/main/resources/icon.png
+}
 
 dependencies {
     compileOnly group: 'net.runelite', name: 'api', version: runeliteVersion
