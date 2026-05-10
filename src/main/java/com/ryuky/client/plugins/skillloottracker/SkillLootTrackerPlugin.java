@@ -92,7 +92,7 @@ public class SkillLootTrackerPlugin extends Plugin
 		overlayManager.add(overlay);
 
 		navButton = NavigationButton.builder()
-				.tooltip("Skilling Loot Tracker")
+				.tooltip("Loot Tracker Skilling")
 				.icon(ImageUtil.loadImageResource(getClass(), "skillingloot-icon.png"))
 				.priority(5)
 				.panel(panel)
