@@ -36,11 +36,3 @@ Skilling Loot Tracker runs silently while you skill and automatically logs every
 
 **Ideal For**  
 Players grinding 99s, Ironmen tracking supplies, and efficiency scapers who want accurate profit data without running 3rd party tools.
-
----
-
-**Why this version works better:**
-1. **Visual hierarchy**: Centered title + image first = instant context. Table breaks up the wall of text.
-2. **Scannable**: Bold feature names + short descriptions let people see value in 5 seconds.
-3. **Matches RuneLite style**: Dark-theme friendly, clean, no fluff.
-4. **Image is intentional**: Centered with proper spacing so the narrow panel doesn’t look out of place.
