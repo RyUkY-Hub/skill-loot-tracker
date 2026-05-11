@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
  * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,15 +23,15 @@
  */
 package com.ryuky.client.plugins.skillloottracker;
 
-import net.runelite.api.MenuAction;
-import net.runelite.client.ui.overlay.Overlay;
-import net.runelite.client.ui.overlay.OverlayMenuEntry;
+import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.components.LineComponent;
+import net.runelite.client.ui.overlay.components.TitleComponent;
 
 import javax.inject.Inject;
 import java.awt.*;
 
-public class SkillLootTrackerOverlay extends Overlay
+public class SkillLootTrackerOverlay extends OverlayPanel
 {
     private final SkillLootTrackerPlugin plugin;
     private final SkillLootTrackerConfig config;
@@ -45,14 +44,34 @@ public class SkillLootTrackerOverlay extends Overlay
         super(plugin);
         this.plugin = plugin;
         this.config = config;
-
         setPosition(OverlayPosition.TOP_LEFT);
-        getMenuEntries().add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY_CONFIG, "Configure", "Skilling Loot Tracker overlay"));
+        // FIXED: Removed getMenuEntries().add() - Configure menu is auto-added
     }
 
     @Override
     public Dimension render(Graphics2D graphics)
     {
-        return null;
+        if (!config.showOverlay())
+        {
+            return null;
+        }
+
+        panelComponent.getChildren().clear();
+
+        panelComponent.getChildren().add(TitleComponent.builder()
+                .text("Skilling Loot")
+                .build());
+
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("Total:")
+                .right(plugin.getSessionTotalValueFormatted())
+                .build());
+
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("Session:")
+                .right(plugin.getSessionTimeFormatted())
+                .build());
+
+        return super.render(graphics);
     }
 }

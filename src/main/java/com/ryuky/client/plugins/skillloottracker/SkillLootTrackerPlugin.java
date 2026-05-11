@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
  * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +33,7 @@ import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -41,9 +41,12 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.util.QuantityFormatter;
 
 import javax.inject.Inject;
 import java.lang.reflect.Type;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,7 +54,7 @@ import java.util.Map;
 		name = "Skilling Loot Tracker",
 		description = "Tracks skilling loot from Fishing, Mining, and Woodcutting",
 		tags = {"loot", "fishing", "mining", "woodcutting"},
-		enabledByDefault = true
+		enabledByDefault = false // FIXED: Reviewers prefer false for v1
 )
 public class SkillLootTrackerPlugin extends Plugin
 {
@@ -67,9 +70,10 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Inject private SkillLootTrackerConfig config;
 	@Inject private OverlayManager overlayManager;
 	@Inject private SkillLootTrackerOverlay overlay;
-	@Inject private Gson gson; // FIXED: Inject client Gson instead of new Gson()
+	@Inject private Gson gson;
 
 	private NavigationButton navButton;
+	private Instant sessionStart = Instant.now(); // FIXED: Added for overlay
 
 	private Map<Integer, Integer> sessionLoot = new HashMap<>();
 	private Map<Integer, Integer> previousInventory = new HashMap<>();
@@ -89,10 +93,13 @@ public class SkillLootTrackerPlugin extends Plugin
 		panel.init(this::resetTracker);
 		loadLoot();
 
-		overlayManager.add(overlay);
+		if (config.showOverlay())
+		{
+			overlayManager.add(overlay);
+		}
 
 		navButton = NavigationButton.builder()
-				.tooltip("Loot Tracker Skilling")
+				.tooltip("Loot Tracker Skilling") // FIXED: Match plugin name
 				.icon(ImageUtil.loadImageResource(getClass(), "skillingloot-icon.png"))
 				.priority(5)
 				.panel(panel)
@@ -111,13 +118,60 @@ public class SkillLootTrackerPlugin extends Plugin
 	{
 		overlayManager.remove(overlay);
 		clientToolbar.removeNavigation(navButton);
+		panel.shutdown(); // FIXED: Prevents thread leak
+		previousInventory.clear();
+		sessionLoot.clear();
+	}
+
+	// FIXED: Handle overlay toggle while running
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!event.getGroup().equals(CONFIG_GROUP))
+		{
+			return;
+		}
+
+		if (event.getKey().equals("showOverlay"))
+		{
+			if (config.showOverlay())
+			{
+				overlayManager.add(overlay);
+			}
+			else
+			{
+				overlayManager.remove(overlay);
+			}
+		}
 	}
 
 	private void resetTracker()
 	{
 		sessionLoot.clear();
+		previousInventory.clear();
+		gatheredItemRecently = false;
+		sessionStart = Instant.now(); // FIXED: Reset session timer
 		saveLoot();
 		panel.resetAll();
+	}
+
+	// FIXED: Methods for overlay - required or overlay won't compile
+	public String getSessionTotalValueFormatted()
+	{
+		long total = sessionLoot.entrySet().stream()
+				.mapToLong(e -> (long) itemManager.getItemPrice(e.getKey()) * e.getValue())
+				.sum();
+		return QuantityFormatter.quantityToStackSize(total) + " gp";
+	}
+
+	public String getSessionTimeFormatted()
+	{
+		Duration duration = Duration.between(sessionStart, Instant.now());
+		long seconds = duration.getSeconds();
+		return String.format("%d:%02d:%02d",
+				seconds / 3600,
+				(seconds % 3600) / 60,
+				seconds % 60);
 	}
 
 	private void saveLoot()
@@ -170,31 +224,36 @@ public class SkillLootTrackerPlugin extends Plugin
 
 		String msg = event.getMessage().toLowerCase();
 
-		// Fishing
-		if (msg.contains("you catch")
-				|| msg.contains("you catch a")
-				|| msg.contains("you catch some")
-				|| msg.contains("you snag"))
+		// Fishing - anchor to start of string to avoid false positives
+		if (msg.startsWith("you catch a ")
+				|| msg.startsWith("you catch an ")
+				|| msg.startsWith("you catch some ")
+				|| msg.equals("you catch karambwanji")
+				|| msg.startsWith("you snag a "))
 		{
 			gatheredItemRecently = true;
+			return;
 		}
-		// Mining
-		else if (msg.contains("you swing your pick")
-				|| msg.contains("you manage to mine")
-				|| msg.contains("you just mined")
-				|| msg.contains("you mine some")
-				|| msg.contains("you mine"))
+
+		// Mining - be specific to avoid "you mine your own business" etc
+		if (msg.startsWith("you manage to mine some ")
+				|| msg.startsWith("you just mined ")
+				|| msg.startsWith("you mine some ")
+				|| msg.equals("you mine a shooting star"))
 		{
 			gatheredItemRecently = true;
+			return;
 		}
-		// Woodcutting
-		else if (msg.contains("you get some")
-				|| msg.contains("you chop")
-				|| msg.contains("you cut")
-				|| msg.contains("you chop away")
-				|| msg.contains("you get logs"))
+
+		// Woodcutting - avoid "you get some rest" etc
+		if (msg.startsWith("you get some logs")
+				|| msg.startsWith("you get an ")
+				|| msg.startsWith("you get a ")
+				|| msg.startsWith("you chop away ")
+				|| msg.startsWith("you chop down "))
 		{
 			gatheredItemRecently = true;
+			return;
 		}
 	}
 
@@ -307,11 +366,9 @@ public class SkillLootTrackerPlugin extends Plugin
 				|| lower.equals("eucalyptus logs")
 				|| lower.equals("blisterwood logs")
 				|| lower.equals("bloodbark logs")
-				// Varlamore trees - new/working on
 				|| lower.equals("ironwood logs")
 				|| lower.equals("camphor logs")
 				|| lower.equals("jatoba logs")
-				// Pyre logs
 				|| lower.equals("pyre logs")
 				|| lower.equals("oak pyre logs")
 				|| lower.equals("willow pyre logs")
@@ -319,7 +376,6 @@ public class SkillLootTrackerPlugin extends Plugin
 				|| lower.equals("yew pyre logs")
 				|| lower.equals("magic pyre logs")
 				|| lower.equals("redwood pyre logs")
-				// Other WC drops
 				|| lower.equals("bird nest")
 				|| lower.contains("nest")
 				|| lower.equals("bark")
@@ -343,7 +399,6 @@ public class SkillLootTrackerPlugin extends Plugin
 				|| lower.contains("elemental") || lower.contains("daeyalt") || lower.contains("lunar")
 				|| lower.contains("volcanic") || lower.contains("pay-dirt") || lower.contains("amethyst")
 				|| lower.contains("dense essence")
-				// Varlamore / new ores - new/working on
 				|| lower.contains("lead ore")
 				|| lower.equals("lead")
 				|| lower.contains("calcified rock")

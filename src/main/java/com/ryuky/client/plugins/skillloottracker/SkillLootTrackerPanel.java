@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
  * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +33,7 @@ import net.runelite.client.util.QuantityFormatter;
 import javax.inject.Inject;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
@@ -47,6 +47,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 	private final JPanel container = new JPanel();
 	private final JLabel totalValueLabel = new JLabel("Total: 0 gp");
 	private final ExecutorService iconLoader = Executors.newSingleThreadExecutor();
+	private final Map<Integer, ItemComposition> compCache = new HashMap<>();
 
 	@Inject
 	private ItemManager itemManager;
@@ -77,7 +78,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 		container.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		container.setBorder(new EmptyBorder(5, 5, 5, 5));
 
-		// Create scroll pane
 		JScrollPane scrollPane = new JScrollPane(container);
 		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 		scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
@@ -85,12 +85,12 @@ public class SkillLootTrackerPanel extends PluginPanel
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
-		// Theme the scrollbar to match RuneLite - put it here
-		scrollPane.getVerticalScrollBar().setUI(new javax.swing.plaf.basic.BasicScrollBarUI() {
+		// Theme scrollbar to match RuneLite - FIXED: Use existing ColorScheme colors
+		scrollPane.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
 			@Override
 			protected void configureScrollBarColors() {
-				this.thumbColor = ColorScheme.DARKER_GRAY_COLOR;
-				this.trackColor = ColorScheme.DARK_GRAY_COLOR;
+				this.thumbColor = ColorScheme.MEDIUM_GRAY_COLOR; // was SCROLLBAR_COLOR
+				this.trackColor = ColorScheme.DARK_GRAY_COLOR;   // was SCROLLBAR_TRACK_COLOR
 			}
 
 			@Override
@@ -120,13 +120,13 @@ public class SkillLootTrackerPanel extends PluginPanel
 		LootBox box = boxes.computeIfAbsent(category, k ->
 		{
 			LootBox newBox = new LootBox(k);
-			container.add(newBox); // initially adds to bottom
+			container.add(newBox);
 			return newBox;
 		});
 
 		// Move this box to the top
 		container.remove(box);
-		container.add(box, 0); // 0 = first position
+		container.add(box, 0);
 
 		box.updateItem(itemId, totalAmount);
 
@@ -159,6 +159,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 	{
 		boxes.clear();
 		container.removeAll();
+		compCache.clear(); // FIXED: Clear cache to prevent memory leak
 		totalValueLabel.setText("Total: 0 gp");
 		repaint();
 		revalidate();
@@ -167,6 +168,11 @@ public class SkillLootTrackerPanel extends PluginPanel
 	public void shutdown()
 	{
 		iconLoader.shutdown();
+	}
+
+	private ItemComposition getComp(int itemId)
+	{
+		return compCache.computeIfAbsent(itemId, itemManager::getItemComposition);
 	}
 
 	private class LootBox extends JPanel
@@ -236,8 +242,11 @@ public class SkillLootTrackerPanel extends PluginPanel
 				final JLabel finalIconLabel = iconLabel;
 				iconLoader.submit(() ->
 				{
-					BufferedImage img = itemManager.getImage(id, 1, false);
-					SwingUtilities.invokeLater(() -> finalIconLabel.setIcon(new ImageIcon(img)));
+					final BufferedImage img = itemManager.getImage(id, 1, false);
+					if (img != null) // FIXED: Null check prevents NPE
+					{
+						SwingUtilities.invokeLater(() -> finalIconLabel.setIcon(new ImageIcon(img)));
+					}
 				});
 
 				itemIcons.put(id, iconLabel);
@@ -247,7 +256,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 		private void updateTooltip(JLabel label, int itemId, int qty)
 		{
-			ItemComposition comp = itemManager.getItemComposition(itemId);
+			ItemComposition comp = getComp(itemId); // FIXED: Use cached comp
 			String itemName = comp.getName();
 
 			long gePrice = itemManager.getItemPrice(itemId);
@@ -282,7 +291,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 		{
 			return itemQtys.entrySet().stream()
 					.mapToLong(e -> {
-						ItemComposition comp = itemManager.getItemComposition(e.getKey());
+						ItemComposition comp = getComp(e.getKey()); // FIXED: Use cached comp
 						return (long) comp.getHaPrice() * e.getValue();
 					})
 					.sum();

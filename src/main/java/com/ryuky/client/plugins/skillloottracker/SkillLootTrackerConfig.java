@@ -1,5 +1,4 @@
 /*
- * Copyright (c) 2017, Steve <steve.rs.dev@gmail.com>
  * Copyright (c) 2026, RyUkY <realmftalk420@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,6 +22,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.ryuky.client.plugins.skillloottracker;
+
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -31,32 +31,34 @@ import net.runelite.client.config.ConfigItem;
 public interface SkillLootTrackerConfig extends Config
 {
 	@ConfigItem(
-			keyName = "trackFishing",
-			name = "Track Fishing",
-			description = "Track fish and other fishing loot"
+			keyName = "showOverlay",
+			name = "Show overlay",
+			description = "Display GP/hr overlay in-game",
+			position = 0
 	)
-	default boolean trackFishing()
-	{
-		return true;
-	}
+	default boolean showOverlay() { return false; }
 
 	@ConfigItem(
-			keyName = "trackWoodcutting",
-			name = "Track Woodcutting",
-			description = "Track logs from woodcutting"
+			keyName = "trackFishing",
+			name = "Track Fishing",
+			description = "Track items gained from Fishing",
+			position = 1
 	)
-	default boolean trackWoodcutting()
-	{
-		return true;
-	}
+	default boolean trackFishing() { return true; }
 
 	@ConfigItem(
 			keyName = "trackMining",
 			name = "Track Mining",
-			description = "Track ores and gems from mining"
+			description = "Track items gained from Mining",
+			position = 2
 	)
-	default boolean trackMining()
-	{
-		return true;
-	}
+	default boolean trackMining() { return true; }
+
+	@ConfigItem(
+			keyName = "trackWoodcutting",
+			name = "Track Woodcutting",
+			description = "Track items gained from Woodcutting",
+			position = 3
+	)
+	default boolean trackWoodcutting() { return true; }
 }
