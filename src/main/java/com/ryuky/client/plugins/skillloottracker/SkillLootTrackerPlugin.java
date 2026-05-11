@@ -54,7 +54,7 @@ import java.util.Map;
 		name = "Skilling Loot Tracker",
 		description = "Tracks skilling loot from Fishing, Mining, and Woodcutting",
 		tags = {"loot", "fishing", "mining", "woodcutting"},
-		enabledByDefault = false // FIXED: Reviewers prefer false for v1
+		enabledByDefault = true // FIXED: Reviewers prefer false for v1
 )
 public class SkillLootTrackerPlugin extends Plugin
 {
