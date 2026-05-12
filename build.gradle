@@ -1,44 +1,47 @@
 plugins {
-    id 'java'
-    id 'com.github.johnrengelman.shadow' version '8.1.1' // for shading, needed for plugins
-    id 'net.runelite' version 'latest.release' // this gives you the runelite{} block
+    id 'java-library'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-group 'com.ryuky.client.plugins.skillloottracker'
-version '1.5.0'
+group = 'net.runelite.client.plugins.skillloottracker' // FIXED: must match package
+version = '1.5.0'
 
 repositories {
-    mavenLocal()
     mavenCentral()
-    maven {
-        url = 'https://repo.runelite.net'
-    }
+    maven { url = 'https://repo.runelite.net' }
 }
 
-def runeliteVersion = 'latest.release'
-
-// This is the block you need for the icon
-runelite {
-    iconPath = "icon.png"  // file must be in src/main/resources/icon.png
-}
+def runeliteVersion = '1.10.42.1' // FIXED: use real version, not 'latest.release'
 
 dependencies {
-    compileOnly group: 'net.runelite', name: 'api', version: runeliteVersion
-    compileOnly group: 'net.runelite', name: 'client', version: runeliteVersion
+    compileOnly "net.runelite:runelite-api:${runeliteVersion}"
+    compileOnly "net.runelite:runelite-client:${runeliteVersion}"
+    
+    // Lombok - match RuneLite version
+    compileOnly 'org.projectlombok:lombok:1.18.32'
+    annotationProcessor 'org.projectlombok:lombok:1.18.32'
 
-    // Lombok
-    compileOnly 'org.projectlombok:lombok:1.18.30'
-    annotationProcessor 'org.projectlombok:lombok:1.18.30'
-
-    // GSON
-    compileOnly 'com.google.code.gson:gson:2.10.1'
+    // GSON is already provided by RuneLite, don't redeclare
+    // compileOnly 'com.google.code.gson:gson:2.10.1'  <-- DELETE THIS
 
     // Testing
-    testImplementation group: 'net.runelite', name: 'api', version: runeliteVersion
-    testImplementation group: 'net.runelite', name: 'client', version: runeliteVersion
+    testImplementation "net.runelite:runelite-api:${runeliteVersion}"
+    testImplementation "net.runelite:runelite-client:${runeliteVersion}"
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.12.0'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(11)
+    }
 }
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
     options.release = 11
+}
+
+shadowJar {
+    archiveClassifier.set('')
 }
