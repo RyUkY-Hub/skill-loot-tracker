@@ -148,11 +148,27 @@ public class SkillLootTrackerPlugin extends Plugin
 	private void resetTracker()
 	{
 		sessionLoot.clear();
-		previousInventory.clear();
 		gatheredItemRecently = false;
-		sessionStart = Instant.now(); // FIXED: Reset session timer
+		sessionStart = Instant.now();
 		saveLoot();
 		panel.resetAll();
+
+		// FIX: Repopulate previousInventory with current items so we don't count existing ones
+		clientThread.invoke(() -> {
+			ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
+			previousInventory.clear();
+			if (inventory != null)
+			{
+				for (Item item : inventory.getItems())
+				{
+					if (item.getId() <= 0) continue;
+
+					ItemComposition comp = itemManager.getItemComposition(item.getId());
+					int id = comp.getNote() != -1 ? comp.getNote() : item.getId();
+					previousInventory.merge(id, item.getQuantity(), Integer::sum);
+				}
+			}
+		});
 	}
 
 	// FIXED: Methods for overlay - required or overlay won't compile
