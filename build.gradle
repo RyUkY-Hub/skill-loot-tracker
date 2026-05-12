@@ -1,47 +1,42 @@
 plugins {
-    id 'java-library'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'java'
 }
 
-group = 'net.runelite.client.plugins.skillloottracker' // FIXED: must match package
-version = '1.5.0'
+group 'net.runelite.client.plugins.skillloottracker'
+version '1.0.0'
 
+// This section tells the computer where to find RuneLite's code
 repositories {
+    mavenLocal()
     mavenCentral()
-    maven { url = 'https://repo.runelite.net' }
+    maven {
+        url = 'https://runelite.net'
+    }
 }
 
-def runeliteVersion = '1.10.42.1' // FIXED: use real version, not 'latest.release'
+def runeliteVersion = '1.10.33' // Update this to the current RuneLite version if needed
 
 dependencies {
-    compileOnly "net.runelite:runelite-api:${runeliteVersion}"
-    compileOnly "net.runelite:runelite-client:${runeliteVersion}"
+    // These are the "libraries" your plugin needs to work
+    compileOnly group: 'net.runelite', name: 'api', version: runeliteVersion
+    compileOnly group: 'net.runelite', name: 'client', version: runeliteVersion
     
-    // Lombok - match RuneLite version
-    compileOnly 'org.projectlombok:lombok:1.18.32'
-    annotationProcessor 'org.projectlombok:lombok:1.18.32'
+    // Lombok handles your @Getter and @Setter
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
 
-    // GSON is already provided by RuneLite, don't redeclare
-    // compileOnly 'com.google.code.gson:gson:2.10.1'  <-- DELETE THIS
+    // Google Guice handles the @Inject
+    compileOnly 'com.google.inject:guice:6.0.0'
 
-    // Testing
-    testImplementation "net.runelite:runelite-api:${runeliteVersion}"
-    testImplementation "net.runelite:runelite-client:${runeliteVersion}"
-    testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.mockito:mockito-core:5.12.0'
-}
+    // GSON handles the JSON saving/loading
+    compileOnly 'com.google.code.gson:gson:2.10.1'
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(11)
-    }
+    // Testing tools for your PluginLuncher
+    testImplementation group: 'net.runelite', name: 'api', version: runeliteVersion
+    testImplementation group: 'net.runelite', name: 'client', version: runeliteVersion
 }
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
-    options.release = 11
-}
-
-shadowJar {
-    archiveClassifier.set('')
+    options.release = 11 // RuneLite currently uses Java 11 for plugins
 }
