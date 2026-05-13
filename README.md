@@ -51,7 +51,7 @@ RuneLite Plugin Hub
 
 License
 
-BSD 2-Clause — Copyright 2026 RyUkY realmftalk420@gmail.com
+BSD 2-Clause — Copyright 2026 RyUkY-Hub realmftalk420@gmail.com
 
 Privacy
 
