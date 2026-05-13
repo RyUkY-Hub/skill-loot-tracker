@@ -160,7 +160,7 @@ public class SkillLootTrackerPlugin extends Plugin
 		panel.init(this::resetAll, this::resetCategory);
 
 		navButton = NavigationButton.builder()
-				.tooltip("Skill Loot Tracker")
+				.tooltip("Loot Tracker Skilling")
 				.icon(ImageUtil.loadImageResource(getClass(), "skillingloot-icon.png"))
 				.priority(5)
 				.panel(panel)
