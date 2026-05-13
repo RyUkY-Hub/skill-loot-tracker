@@ -340,7 +340,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 	private class LootBox extends JPanel
 	{
-		private final JPanel itemGrid = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 6));
+		private final JPanel itemGrid = new JPanel(new GridLayout(0, 4, 6, 6));
 		private final JPanel subtotalPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		private final Map<Integer, JPanel> itemBoxes = new HashMap<>();
 		private final Map<Integer, Integer> itemQtys = new HashMap<>();
