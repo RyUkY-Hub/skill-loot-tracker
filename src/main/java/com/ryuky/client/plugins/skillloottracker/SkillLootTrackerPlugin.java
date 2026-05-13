@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.ryuky.client.plugins.skillloottracker;
+package net.runelite.client.plugins.skillloottracker;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
@@ -36,6 +36,7 @@ import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -47,6 +48,8 @@ import net.runelite.client.util.QuantityFormatter;
 
 import javax.inject.Inject;
 import java.lang.reflect.Type;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -60,8 +63,7 @@ import java.util.Set;
 public class SkillLootTrackerPlugin extends Plugin
 {
 	private static final String DATA_KEY = "lootData";
-	private static final String SESSION_TIME_KEY = "sessionStartTime";
-	private static final Gson GSON = new Gson();
+	private static final String ACCUMULATED_TIME_KEY = "accumulatedTimeMs";
 
 	private static final Set<Integer> LOG_IDS = ImmutableSet.of(
 			1511, 2862, 1521, 1519, 6333, 10810, 1517, 6332, 1515, 1513,
@@ -132,6 +134,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Inject private OverlayManager overlayManager;
 	@Inject private SkillLootTrackerOverlay overlay;
 	@Inject private ConfigManager configManager;
+	@Inject private Gson gson;
 
 	private SkillLootTrackerPanel panel;
 	private NavigationButton navButton;
@@ -139,9 +142,12 @@ public class SkillLootTrackerPlugin extends Plugin
 	private final Map<String, Map<Integer, Integer>> lootPerSkill = new HashMap<>();
 	private final Map<Integer, Integer> lastInventory = new HashMap<>();
 
-	private long sessionStartTime = 0L;
 	private volatile boolean resetInProgress = false;
 	private boolean dataLoaded = false;
+
+	private boolean sessionActive = false;
+	private Instant sessionStart = Instant.now();
+	private Duration accumulatedTime = Duration.ZERO;
 
 	private String lastSkillAction = null;
 	private long lastSkillActionTime = 0L;
@@ -173,6 +179,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		pauseSession();
 		saveData();
 		clientToolbar.removeNavigation(navButton);
 		overlayManager.remove(overlay);
@@ -189,6 +196,67 @@ public class SkillLootTrackerPlugin extends Plugin
 		{
 			clientThread.invokeLater(this::loadData);
 		}
+
+		switch (event.getGameState())
+		{
+			case LOGGED_IN:
+				if (config.enableTimer()) resumeSession();
+				break;
+
+			case HOPPING:
+			case LOGGING_IN:
+			case LOGIN_SCREEN:
+			case CONNECTION_LOST:
+				pauseSession();
+				break;
+		}
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!event.getGroup().equals("skillloottracker")) return;
+
+		switch (event.getKey())
+		{
+			case "enableTimer":
+				if (config.enableTimer()) resumeSession();
+				else pauseSession();
+				break;
+			case "pauseTimer":
+				if (config.pauseTimer()) pauseSession();
+				else if (config.enableTimer()) resumeSession();
+				break;
+			case "resetTimer":
+				if (config.resetTimer())
+				{
+					accumulatedTime = Duration.ZERO;
+					sessionStart = Instant.now();
+					configManager.setConfiguration("skillloottracker", "resetTimer", false);
+					log.debug("Session timer reset via config");
+				}
+				break;
+		}
+	}
+
+	private void resumeSession()
+	{
+		if (!sessionActive && dataLoaded && config.enableTimer() && !config.pauseTimer())
+		{
+			sessionActive = true;
+			sessionStart = Instant.now();
+			log.debug("Session timer resumed");
+		}
+	}
+
+	private void pauseSession()
+	{
+		if (sessionActive)
+		{
+			accumulatedTime = accumulatedTime.plus(Duration.between(sessionStart, Instant.now()));
+			sessionActive = false;
+			log.debug("Session timer paused");
+		}
 	}
 
 	private void loadData()
@@ -201,15 +269,15 @@ public class SkillLootTrackerPlugin extends Plugin
 			if (json != null && !json.isBlank())
 			{
 				Type type = new TypeToken<Map<String, Map<Integer, Integer>>>() {}.getType();
-				Map<String, Map<Integer, Integer>> loaded = GSON.fromJson(json, type);
+				Map<String, Map<Integer, Integer>> loaded = gson.fromJson(json, type);
 				if (loaded != null)
 				{
 					lootPerSkill.putAll(loaded);
 				}
 			}
 
-			Long savedTime = configManager.getConfiguration("skillloottracker", SESSION_TIME_KEY, Long.class);
-			sessionStartTime = (savedTime != null) ? savedTime : System.currentTimeMillis();
+			Long savedMs = configManager.getConfiguration("skillloottracker", ACCUMULATED_TIME_KEY, Long.class);
+			accumulatedTime = savedMs != null ? Duration.ofMillis(savedMs) : Duration.ZERO;
 
 			lootPerSkill.forEach((category, items) -> {
 				items.forEach((itemId, qty) -> {
@@ -219,12 +287,13 @@ public class SkillLootTrackerPlugin extends Plugin
 			});
 
 			dataLoaded = true;
+			if (config.enableTimer() && !config.pauseTimer()) resumeSession();
 			log.info("Skill Loot Tracker data loaded");
 		}
 		catch (Exception e)
 		{
 			log.warn("Failed to load skill loot data", e);
-			sessionStartTime = System.currentTimeMillis();
+			accumulatedTime = Duration.ZERO;
 			dataLoaded = true;
 		}
 	}
@@ -233,16 +302,15 @@ public class SkillLootTrackerPlugin extends Plugin
 	{
 		try
 		{
-			String json = GSON.toJson(lootPerSkill);
+			String json = gson.toJson(lootPerSkill);
 			configManager.setConfiguration("skillloottracker", DATA_KEY, json);
-			configManager.setConfiguration("skillloottracker", SESSION_TIME_KEY, sessionStartTime);
+			configManager.setConfiguration("skillloottracker", ACCUMULATED_TIME_KEY, getCurrentSessionDuration().toMillis());
 		}
 		catch (Exception e)
 		{
 			log.warn("Failed to save loot data", e);
 		}
 	}
-
 
 	@Subscribe
 	public void onAnimationChanged(AnimationChanged event)
@@ -365,7 +433,8 @@ public class SkillLootTrackerPlugin extends Plugin
 		resetInProgress = true;
 		lootPerSkill.clear();
 		lastInventory.clear();
-		sessionStartTime = System.currentTimeMillis();
+		accumulatedTime = Duration.ZERO;
+		sessionStart = Instant.now();
 		panel.resetAll();
 
 		clientThread.invoke(() -> {
@@ -429,8 +498,18 @@ public class SkillLootTrackerPlugin extends Plugin
 
 		if (lootPerSkill.isEmpty())
 		{
-			sessionStartTime = System.currentTimeMillis();
+			accumulatedTime = Duration.ZERO;
+			sessionStart = Instant.now();
 		}
+	}
+
+	private Duration getCurrentSessionDuration()
+	{
+		if (sessionActive)
+		{
+			return accumulatedTime.plus(Duration.between(sessionStart, Instant.now()));
+		}
+		return accumulatedTime;
 	}
 
 	public String getSessionTotalValueFormatted()
@@ -464,23 +543,27 @@ public class SkillLootTrackerPlugin extends Plugin
 
 	public String getGpPerHourFormatted()
 	{
-		if (sessionStartTime == 0L) return "0 gp/hr";
+		Duration d = getCurrentSessionDuration();
+		if (d.getSeconds() < 6) return "---";
+
 		long total = getSessionTotalValueRaw();
-		long elapsedMs = System.currentTimeMillis() - sessionStartTime;
-		if (elapsedMs < 6000) return "---";
-		double hours = elapsedMs / 3600000.0;
+		double hours = d.getSeconds() / 3600.0;
 		long gpPerHr = (long) (total / hours);
 		return QuantityFormatter.quantityToStackSize(gpPerHr) + " gp/hr";
 	}
 
 	public String getSessionTimeFormatted()
 	{
-		if (sessionStartTime == 0L) return "00:00:00";
-		long elapsedMs = System.currentTimeMillis() - sessionStartTime;
-		long seconds = elapsedMs / 1000;
+		Duration d = getCurrentSessionDuration();
+		long seconds = d.getSeconds();
 		long hours = seconds / 3600;
 		long minutes = (seconds % 3600) / 60;
 		long secs = seconds % 60;
 		return String.format("%02d:%02d:%02d", hours, minutes, secs);
+	}
+
+	public boolean isTimerActive()
+	{
+		return sessionActive;
 	}
 }
