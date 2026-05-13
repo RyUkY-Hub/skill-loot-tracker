@@ -26,6 +26,7 @@ package com.ryuky.client.plugins.skillloottracker;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.ConfigSection;
 
 @ConfigGroup("skillloottracker")
 public interface SkillLootTrackerConfig extends Config
@@ -77,4 +78,47 @@ public interface SkillLootTrackerConfig extends Config
 			position = 5
 	)
 	default boolean trackHunter() { return true; }
+
+	@ConfigSection(
+			name = "Session Timer",
+			description = "Control the session timer",
+			position = 6
+	)
+	String timerSection = "timerSection";
+
+	@ConfigItem(
+			keyName = "enableTimer",
+			name = "Enable Timer",
+			description = "Turn the session timer on/off. Timer auto-pauses on logout/hop",
+			section = timerSection,
+			position = 0
+	)
+	default boolean enableTimer()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+			keyName = "pauseTimer",
+			name = "Pause Timer",
+			description = "Manually pause the session timer",
+			section = timerSection,
+			position = 1
+	)
+	default boolean pauseTimer()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+			keyName = "resetTimer",
+			name = "Reset Timer",
+			description = "Reset the session timer to 00:00:00",
+			section = timerSection,
+			position = 2
+	)
+	default boolean resetTimer()
+	{
+		return false;
+	}
 }
