@@ -37,7 +37,7 @@ public class SkillLootTrackerOverlay extends OverlayPanel
     private final SkillLootTrackerConfig config;
 
     @Inject
-    private SkillLootTrackerOverlay(
+    public SkillLootTrackerOverlay(
             SkillLootTrackerPlugin plugin,
             SkillLootTrackerConfig config)
     {

@@ -264,7 +264,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 		if (sessionStartTime != 0L)
 		{
 			long elapsed = System.currentTimeMillis() - sessionStartTime;
-			if (elapsed > 0)
+			if (elapsed > 1000)
 			{
 				long gpHr = (totalSessionValue * 3600000L) / elapsed;
 				gpHrText = "Total per hr: " + QuantityFormatter.formatNumber(gpHr) + "/hr";

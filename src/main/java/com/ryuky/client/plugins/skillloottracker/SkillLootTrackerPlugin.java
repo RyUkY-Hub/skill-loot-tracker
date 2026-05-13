@@ -53,6 +53,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @PluginDescriptor(
@@ -142,7 +143,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	private final Map<String, Map<Integer, Integer>> lootPerSkill = new HashMap<>();
 	private final Map<Integer, Integer> lastInventory = new HashMap<>();
 
-	private volatile boolean resetInProgress = false;
+	private final AtomicBoolean resetInProgress = new AtomicBoolean(false);
 	private boolean dataLoaded = false;
 
 	private boolean sessionActive = false;
@@ -183,7 +184,7 @@ public class SkillLootTrackerPlugin extends Plugin
 		saveData();
 		clientToolbar.removeNavigation(navButton);
 		overlayManager.remove(overlay);
-		panel.shutdown();
+		panel.shutdown();  // <- add this line
 		lootPerSkill.clear();
 		lastInventory.clear();
 		dataLoaded = false;
@@ -200,7 +201,7 @@ public class SkillLootTrackerPlugin extends Plugin
 		switch (event.getGameState())
 		{
 			case LOGGED_IN:
-				if (config.enableTimer()) resumeSession();
+				if (config.enableTimer() && !config.pauseTimer()) resumeSession();
 				break;
 
 			case HOPPING:
@@ -359,11 +360,12 @@ public class SkillLootTrackerPlugin extends Plugin
 		{
 			if (item.getId() > 0)
 			{
-				currentInventory.merge(item.getId(), item.getQuantity(), Integer::sum);
+				int canonicalId = itemManager.canonicalize(item.getId());
+				currentInventory.merge(canonicalId, item.getQuantity(), Integer::sum);
 			}
 		}
 
-		if (resetInProgress)
+		if (resetInProgress.get())
 		{
 			lastInventory.clear();
 			lastInventory.putAll(currentInventory);
@@ -430,7 +432,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	}
 	private void resetAll()
 	{
-		resetInProgress = true;
+		resetInProgress.set(true);
 		lootPerSkill.clear();
 		lastInventory.clear();
 		accumulatedTime = Duration.ZERO;
@@ -454,14 +456,14 @@ public class SkillLootTrackerPlugin extends Plugin
 			}
 			finally
 			{
-				resetInProgress = false;
+				resetInProgress.set(false);
 			}
 		});
 	}
 
 	private void resetCategory(String category)
 	{
-		resetInProgress = true;
+		resetInProgress.set(true);
 		lootPerSkill.remove(category);
 		clientThread.invoke(() -> {
 			try
@@ -492,15 +494,10 @@ public class SkillLootTrackerPlugin extends Plugin
 			}
 			finally
 			{
-				resetInProgress = false;
+				resetInProgress.set(false);
 			}
 		});
 
-		if (lootPerSkill.isEmpty())
-		{
-			accumulatedTime = Duration.ZERO;
-			sessionStart = Instant.now();
-		}
 	}
 
 	private Duration getCurrentSessionDuration()
