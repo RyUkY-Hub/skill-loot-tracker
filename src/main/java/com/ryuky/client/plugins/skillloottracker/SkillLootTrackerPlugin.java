@@ -53,7 +53,7 @@ import java.util.Set;
 
 @Slf4j
 @PluginDescriptor(
-		name = "Skill Loot Tracker",
+		name = "Skilling Loot Tracker",
 		description = "Tracks loot gained from skilling activities",
 		tags = {"skill", "loot", "tracker", "fishing", "mining", "woodcutting", "farming", "hunter"}
 )
