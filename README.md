@@ -74,7 +74,11 @@ Players grinding 99s, Ironmen tracking supplies, efficiency scapers who want acc
 
 What’s New in 2.0.0
 Farming + Hunter Added: Now tracks herb runs, birdhouse runs, chinchompas, salamanders, and more
+
 Full Side Panel UI: Complete item breakdown with sprites, not just overlay text
+
 Session Persistence: Data now saves between logins using ConfigManager
+
 GameStateChanged Handler: Properly pauses/resumes sessions in config and on logout/hop
+
 Expanded Item Database: More LOG_IDS and FISH_IDS coverage
