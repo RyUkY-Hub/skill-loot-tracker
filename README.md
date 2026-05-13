@@ -1,7 +1,8 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/adc57211-b75b-4d9d-9c95-cc4f814eadbe" alt="Skilling Loot Tracker Panel" width="232" />
+  <img src="https://github.com/user-attachments/assets/4423fd75-35e9-403d-b6b6-80d20e5ca956" 
+       alt="Skilling Loot Tracker Panel" 
+       width="270" />
 </p>
-
 <h1 align="center">Skilling Loot Tracker v2.0.0</h1>
 <p align="center">
   <b>A RuneLite plugin for tracking resources and profit from gathering skills</b><br>
