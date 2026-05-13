@@ -45,7 +45,6 @@ public class SkillLootTrackerOverlay extends OverlayPanel
         this.plugin = plugin;
         this.config = config;
         setPosition(OverlayPosition.TOP_LEFT);
-        // FIXED: Removed getMenuEntries().add() - Configure menu is auto-added
     }
 
     @Override
@@ -57,6 +56,9 @@ public class SkillLootTrackerOverlay extends OverlayPanel
         }
 
         panelComponent.getChildren().clear();
+
+        panelComponent.setPreferredSize(new Dimension(220, 0));
+        panelComponent.setGap(new Point(0, 2));
 
         panelComponent.getChildren().add(TitleComponent.builder()
                 .text("Skilling Loot")
