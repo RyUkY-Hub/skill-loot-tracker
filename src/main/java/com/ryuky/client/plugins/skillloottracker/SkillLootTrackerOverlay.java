@@ -61,17 +61,43 @@ public class SkillLootTrackerOverlay extends OverlayPanel
         panelComponent.setGap(new Point(0, 2));
 
         panelComponent.getChildren().add(TitleComponent.builder()
-                .text("Skilling Loot")
+                .text("Skilling Loot Tracker")
+                .color(new Color(191, 64, 191)) // Bright electric purple
                 .build());
 
         panelComponent.getChildren().add(LineComponent.builder()
-                .left("Total:")
-                .right(plugin.getSessionTotalValueFormatted())
-                .build());
-
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left("Session:")
+                .left("Time:")
+                .leftColor(Color.LIGHT_GRAY)
                 .right(plugin.getSessionTimeFormatted())
+                .rightColor(new Color(225, 103, 0)) // Orange
+                .build());
+
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("GE/hr:")
+                .leftColor(Color.LIGHT_GRAY)
+                .right(plugin.getGpPerHourFormatted())
+                .rightColor(new Color(126, 255, 126)) // Green
+                .build());
+
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("HA/hr:")
+                .leftColor(Color.LIGHT_GRAY)
+                .right(plugin.getSessionHaPerHourFormatted())
+                .rightColor(new Color(255, 255, 126)) // Yellow
+                .build());
+
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("GE Total:")
+                .leftColor(Color.LIGHT_GRAY)
+                .right(plugin.getSessionGeValueFormatted())
+                .rightColor(new Color(126, 255, 126))
+                .build());
+
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("HA Total:")
+                .leftColor(Color.LIGHT_GRAY)
+                .right(plugin.getSessionHaValueFormatted())
+                .rightColor(new Color(255, 255, 126))
                 .build());
 
         return super.render(graphics);

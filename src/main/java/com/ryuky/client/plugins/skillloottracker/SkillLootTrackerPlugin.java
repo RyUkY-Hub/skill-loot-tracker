@@ -53,6 +53,9 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -81,7 +84,8 @@ public class SkillLootTrackerPlugin extends Plugin
 	private static final Set<Integer> ORE_IDS = ImmutableSet.of(
 			1436, 7936, 434, 436, 438, 3211, 668, 440, 2892, 442, 453, 23491,
 			444, 6971, 6973, 6975, 6977, 1625, 21905, 6983, 6979, 6981, 447,
-			13356, 449, 451, 21347, 9631, 21552, 31716, 25527
+			13356, 449, 451, 21347, 9631, 21552, 31716, 25527, 1627, 1629,
+			1623, 1621, 1619,1617
 	);
 
 	private static final Set<Integer> FARMING_IDS = ImmutableSet.of(
@@ -153,6 +157,18 @@ public class SkillLootTrackerPlugin extends Plugin
 	private String lastSkillAction = null;
 	private long lastSkillActionTime = 0L;
 	private static final long SKILL_WINDOW_MS = 3500;
+	private long haTotal = 0;
+	private long sessionHaValue = 0;
+	public long getSessionHaValueRaw()
+	{
+		return sessionHaValue;
+	}
+
+	private int currentHaPrice = 0;
+
+	private long startTime = System.currentTimeMillis();
+
+	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
 	@Provides
 	SkillLootTrackerConfig provideConfig(ConfigManager configManager)
@@ -164,7 +180,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	protected void startUp()
 	{
 		panel = injector.getInstance(SkillLootTrackerPanel.class);
-		panel.init(this::resetAll, this::resetCategory);
+		panel.init(this::resetAll, this::resetCategory, this::resetTimer);
 
 		navButton = NavigationButton.builder()
 				.tooltip("Loot Tracker Skilling")
@@ -175,6 +191,14 @@ public class SkillLootTrackerPlugin extends Plugin
 
 		clientToolbar.addNavigation(navButton);
 		overlayManager.add(overlay);
+
+		// Update timer label every second
+		scheduler.scheduleAtFixedRate(() -> {
+			if (panel!= null)
+			{
+				panel.setTimerText(getSessionTimeFormatted());
+			}
+		}, 0, 1, TimeUnit.SECONDS);
 	}
 
 	@Override
@@ -185,6 +209,7 @@ public class SkillLootTrackerPlugin extends Plugin
 		clientToolbar.removeNavigation(navButton);
 		overlayManager.remove(overlay);
 		panel.shutdown();
+		scheduler.shutdownNow();
 		lootPerSkill.clear();
 		lastInventory.clear();
 		dataLoaded = false;
@@ -193,7 +218,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		if (event.getGameState() == GameState.LOGGED_IN && !dataLoaded)
+		if (event.getGameState() == GameState.LOGGED_IN &&!dataLoaded)
 		{
 			clientThread.invokeLater(this::loadData);
 		}
@@ -201,7 +226,7 @@ public class SkillLootTrackerPlugin extends Plugin
 		switch (event.getGameState())
 		{
 			case LOGGED_IN:
-				if (config.enableTimer() && !config.pauseTimer()) resumeSession();
+				if (config.enableTimer() &&!config.pauseTimer()) resumeSession();
 				break;
 
 			case HOPPING:
@@ -231,10 +256,8 @@ public class SkillLootTrackerPlugin extends Plugin
 			case "resetTimer":
 				if (config.resetTimer())
 				{
-					accumulatedTime = Duration.ZERO;
-					sessionStart = Instant.now();
+					resetTimer();
 					configManager.setConfiguration("skillloottracker", "resetTimer", false);
-					log.debug("Session timer reset via config");
 				}
 				break;
 		}
@@ -242,7 +265,7 @@ public class SkillLootTrackerPlugin extends Plugin
 
 	private void resumeSession()
 	{
-		if (!sessionActive && dataLoaded && config.enableTimer() && !config.pauseTimer())
+		if (!sessionActive && dataLoaded && config.enableTimer() &&!config.pauseTimer())
 		{
 			sessionActive = true;
 			sessionStart = Instant.now();
@@ -267,28 +290,49 @@ public class SkillLootTrackerPlugin extends Plugin
 		try
 		{
 			String json = configManager.getConfiguration("skillloottracker", DATA_KEY);
-			if (json != null && !json.isBlank())
+			if (json!= null &&!json.isBlank())
 			{
 				Type type = new TypeToken<Map<String, Map<Integer, Integer>>>() {}.getType();
 				Map<String, Map<Integer, Integer>> loaded = gson.fromJson(json, type);
-				if (loaded != null)
+				if (loaded!= null)
 				{
 					lootPerSkill.putAll(loaded);
 				}
 			}
 
 			Long savedMs = configManager.getConfiguration("skillloottracker", ACCUMULATED_TIME_KEY, Long.class);
-			accumulatedTime = savedMs != null ? Duration.ofMillis(savedMs) : Duration.ZERO;
+			accumulatedTime = savedMs!= null? Duration.ofMillis(savedMs) : Duration.ZERO;
 
-			lootPerSkill.forEach((category, items) -> {
-				items.forEach((itemId, qty) -> {
-					int geValue = itemManager.getItemPrice(itemId) * qty;
-					panel.updateLoot(itemId, qty, geValue, category);
-				});
-			});
+			for (Map.Entry<String, Map<Integer, Integer>> catEntry : lootPerSkill.entrySet())
+			{
+				String category = catEntry.getKey();
+				for (Map.Entry<Integer, Integer> itemEntry : catEntry.getValue().entrySet())
+				{
+					int itemId = itemEntry.getKey();
+					int qty = itemEntry.getValue();
+					ItemComposition comp = itemManager.getItemComposition(itemId);
+					String itemName = comp.getName();
+					long gePrice = itemManager.getItemPrice(itemId);
+					long haPrice = comp.getHaPrice();
+					long elapsedMs = getCurrentSessionDuration().toMillis();
+					panel.updateLoot(
+							itemId,
+							qty,  // or totalQty, or whatever your variable is called
+							QuantityFormatter.quantityToStackSize(gePrice),
+							QuantityFormatter.quantityToStackSize(haPrice),
+							category,
+							itemName,
+							gePrice,
+							haPrice
+					);
+
+					updatePanelTotals();
+				}
+			}
+			updatePanelTotals();
 
 			dataLoaded = true;
-			if (config.enableTimer() && !config.pauseTimer()) resumeSession();
+			if (config.enableTimer() &&!config.pauseTimer()) resumeSession();
 			log.info("Skill Loot Tracker data loaded");
 		}
 		catch (Exception e)
@@ -316,7 +360,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Subscribe
 	public void onAnimationChanged(AnimationChanged event)
 	{
-		if (event.getActor() != client.getLocalPlayer()) return;
+		if (event.getActor()!= client.getLocalPlayer()) return;
 		updateLastSkillAction();
 	}
 
@@ -351,7 +395,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		if (event.getContainerId() != InventoryID.INVENTORY.getId()) return;
+		if (event.getContainerId()!= InventoryID.INVENTORY.getId()) return;
 
 		ItemContainer inventory = event.getItemContainer();
 		Map<Integer, Integer> currentInventory = new HashMap<>();
@@ -382,7 +426,7 @@ public class SkillLootTrackerPlugin extends Plugin
 			{
 				int diff = currentQty - lastQty;
 				String category = getCategory(itemId);
-				if (category != null && shouldTrackItem(category))
+				if (category!= null && shouldTrackItem(category))
 				{
 					trackLoot(category, itemId, diff);
 				}
@@ -413,12 +457,59 @@ public class SkillLootTrackerPlugin extends Plugin
 	{
 		Map<Integer, Integer> categoryLoot = lootPerSkill.computeIfAbsent(category, k -> new HashMap<>());
 		int newTotal = categoryLoot.merge(itemId, qty, Integer::sum);
-		int geValue = itemManager.getItemPrice(itemId) * qty;
 
-		panel.updateLoot(itemId, newTotal, geValue, category);
+		clientThread.invoke(() -> {
+			ItemComposition comp = itemManager.getItemComposition(itemId);
+			String itemName = comp.getName();
+			long gePrice = itemManager.getItemPrice(itemId);
+			long haPrice = comp.getHaPrice();
+			long elapsedMs = getCurrentSessionDuration().toMillis();
+
+			panel.updateLoot(
+					itemId,
+					newTotal,
+					QuantityFormatter.quantityToStackSize(gePrice),
+					QuantityFormatter.quantityToStackSize(haPrice),
+					category,
+					itemName,
+					gePrice,
+					haPrice
+			);
+
+			updatePanelTotals();
+		}); // closes clientThread.invoke lambda
 
 		if (newTotal % 5 == 0 || newTotal <= 5)
 			saveData();
+	} // closes trackLoot method
+
+	private void updatePanelTotals()
+	{
+		clientThread.invoke(() -> {
+			long totalGe = 0L;
+			long totalHa = 0L;
+			for (Map<Integer, Integer> items : lootPerSkill.values())
+			{
+				for (Map.Entry<Integer, Integer> entry : items.entrySet())
+				{
+					int id = entry.getKey();
+					int qty = entry.getValue();
+					totalGe += (long) itemManager.getItemPrice(id) * qty;
+					totalHa += (long) itemManager.getItemComposition(id).getHaPrice() * qty;
+				}
+			}
+			sessionHaValue = totalHa;
+			Duration d = getCurrentSessionDuration();
+			String gpHrText = "Total per hr: 0/hr";
+			if (d.getSeconds() > 6)
+			{
+				double hours = d.getSeconds() / 3600.0;
+				long gpPerHr = (long) (totalGe / hours);
+				gpHrText = "Total per hr: " + QuantityFormatter.formatNumber(gpPerHr) + "/hr";
+			}
+
+			panel.setTotalsText(gpHrText, "GE: " + QuantityFormatter.formatNumber(totalGe) + " gp", "HA: " + QuantityFormatter.formatNumber(totalHa) + " gp");
+		});
 	}
 
 	private String getCategory(int itemId)
@@ -430,6 +521,7 @@ public class SkillLootTrackerPlugin extends Plugin
 		if (HUNTER_IDS.contains(itemId)) return "Hunter";
 		return null;
 	}
+
 	private void resetAll()
 	{
 		resetInProgress.set(true);
@@ -443,7 +535,7 @@ public class SkillLootTrackerPlugin extends Plugin
 			try
 			{
 				ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
-				if (inventory != null)
+				if (inventory!= null)
 				{
 					for (Item item : inventory.getItems())
 					{
@@ -469,7 +561,7 @@ public class SkillLootTrackerPlugin extends Plugin
 			try
 			{
 				ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
-				if (inventory != null)
+				if (inventory!= null)
 				{
 					Set<Integer> categoryIds;
 					switch (category)
@@ -491,16 +583,24 @@ public class SkillLootTrackerPlugin extends Plugin
 						}
 					}
 				}
+				updatePanelTotals();
 			}
 			finally
 			{
 				resetInProgress.set(false);
 			}
 		});
-
 	}
 
-	private Duration getCurrentSessionDuration()
+	private void resetTimer()
+	{
+		accumulatedTime = Duration.ZERO;
+		sessionStart = Instant.now();
+		updatePanelTotals();
+		log.debug("Session timer reset via panel button");
+	}
+
+	public  Duration getCurrentSessionDuration()
 	{
 		if (sessionActive)
 		{
@@ -508,34 +608,25 @@ public class SkillLootTrackerPlugin extends Plugin
 		}
 		return accumulatedTime;
 	}
-
-	public String getSessionTotalValueFormatted()
+	public String getSessionGeValueFormatted()
 	{
-		long total = lootPerSkill.values().stream()
-				.flatMap(m -> m.entrySet().stream())
-				.mapToLong(e -> (long) itemManager.getItemPrice(e.getKey()) * e.getValue())
-				.sum();
+		long total = getSessionTotalValueRaw();
 		return QuantityFormatter.quantityToStackSize(total) + " gp";
 	}
 
 	public String getSessionHaValueFormatted()
 	{
-		long total = lootPerSkill.values().stream()
-				.flatMap(m -> m.entrySet().stream())
-				.mapToLong(e -> {
-					ItemComposition comp = itemManager.getItemComposition(e.getKey());
-					return (long) comp.getHaPrice() * e.getValue();
-				})
-				.sum();
-		return QuantityFormatter.quantityToStackSize(total) + " gp";
-	}
-
-	public long getSessionTotalValueRaw()
-	{
-		return lootPerSkill.values().stream()
-				.flatMap(m -> m.entrySet().stream())
-				.mapToLong(e -> (long) itemManager.getItemPrice(e.getKey()) * e.getValue())
-				.sum();
+		final long[] total = {0L};
+		clientThread.invoke(() -> {
+			total[0] = lootPerSkill.values().stream()
+					.flatMap(m -> m.entrySet().stream())
+					.mapToLong(e -> {
+						ItemComposition comp = itemManager.getItemComposition(e.getKey());
+						return (long) comp.getHaPrice() * e.getValue();
+					})
+					.sum();
+		});
+		return QuantityFormatter.quantityToStackSize(total[0]) + " gp";
 	}
 
 	public String getGpPerHourFormatted()
@@ -548,6 +639,20 @@ public class SkillLootTrackerPlugin extends Plugin
 		long gpPerHr = (long) (total / hours);
 		return QuantityFormatter.quantityToStackSize(gpPerHr) + " gp/hr";
 	}
+	public String getSessionHaPerHourFormatted()
+	{
+		Duration d = getCurrentSessionDuration();
+
+		long haTotalRaw = sessionHaValue;
+
+		if (d.getSeconds() < 6 || haTotalRaw <= 0) {
+			return "--- gp/hr";
+		}
+
+		double hours = d.getSeconds() / 3600.0;
+		long haPerHr = (long) (haTotalRaw / hours);
+		return QuantityFormatter.quantityToStackSize(haPerHr) + " gp/hr";
+	}
 
 	public String getSessionTimeFormatted()
 	{
@@ -558,9 +663,21 @@ public class SkillLootTrackerPlugin extends Plugin
 		long secs = seconds % 60;
 		return String.format("%02d:%02d:%02d", hours, minutes, secs);
 	}
+	private long getSessionTotalValueRaw()
+	{
+		final long[] total = {0L};
+		clientThread.invoke(() -> {
+			total[0] = lootPerSkill.values().stream()
+					.flatMap(m -> m.entrySet().stream())
+					.mapToLong(e -> (long) itemManager.getItemPrice(e.getKey()) * e.getValue())
+					.sum();
+		});
+		return total[0];
+	}
 
 	public boolean isTimerActive()
 	{
 		return sessionActive;
 	}
+
 }
