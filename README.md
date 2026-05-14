@@ -19,10 +19,9 @@
 
 ### Screenshots
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6457febd-2b5b-4a6a-b0ed-94f7ea7c51da" alt="Side Panel View" width="263" />
-  <img src="https://github.com/user-attachments/assets/5cf66b1c-1628-4fb8-a092-5899345dfc6c" alt="In-Game Overlay" width="335" />
-<img width="267" height="447" alt="image" src="https://github.com/user-attachments/assets/f2c388cc-3d57-427e-8011-f04247dbb410" />
-
+  <img src="https://github.com/user-attachments/assets/6457febd-2b5b-4a6a-b0ed-94f7ea7c51da" alt="Side Panel View" width="197" />
+  <img src="https://github.com/user-attachments/assets/5cf66b1c-1628-4fb8-a092-5899345dfc6c" alt="In-Game Overlay" width="251" />
+  <img src="https://github.com/user-attachments/assets/f2c388cc-3d57-427e-8011-f04247dbb410" alt="image" width="200" />
 </p>
 
 ## Overview
