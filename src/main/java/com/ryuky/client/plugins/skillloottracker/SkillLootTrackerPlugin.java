@@ -184,7 +184,7 @@ public class SkillLootTrackerPlugin extends Plugin
 		saveData();
 		clientToolbar.removeNavigation(navButton);
 		overlayManager.remove(overlay);
-		panel.shutdown();  // <- add this line
+		panel.shutdown();
 		lootPerSkill.clear();
 		lastInventory.clear();
 		dataLoaded = false;
