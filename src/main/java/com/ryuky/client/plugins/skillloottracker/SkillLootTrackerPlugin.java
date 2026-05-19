@@ -177,29 +177,33 @@ public class SkillLootTrackerPlugin extends Plugin
 	}
 
 	@Override
-	protected void startUp()
-	{
-		panel = injector.getInstance(SkillLootTrackerPanel.class);
-		panel.init(this::resetAll, this::resetCategory, this::resetTimer);
+protected void startUp()
+{
+    panel = injector.getInstance(SkillLootTrackerPanel.class);
+    panel.init(this::resetAll, this::resetCategory, this::resetTimer);
 
-		navButton = NavigationButton.builder()
-				.tooltip("Loot Tracker Skilling")
-				.icon(ImageUtil.loadImageResource(getClass(), "skillingloot-icon.png"))
-				.priority(5)
-				.panel(panel)
-				.build();
+    navButton = NavigationButton.builder()
+            .tooltip("Loot Tracker Skilling")
+            .icon(ImageUtil.loadImageResource(getClass(), "skillingloot-icon.png"))
+            .priority(5)
+            .panel(panel)
+            .build();
 
-		clientToolbar.addNavigation(navButton);
-		overlayManager.add(overlay);
+    clientToolbar.addNavigation(navButton);
+    overlayManager.add(overlay);
 
-		// Update timer label every second
-		scheduler.scheduleAtFixedRate(() -> {
-			if (panel!= null)
-			{
-				panel.setTimerText(getSessionTimeFormatted());
-			}
-		}, 0, 1, TimeUnit.SECONDS);
-	}
+    scheduler.scheduleAtFixedRate(() -> {
+        if (panel != null)
+        {
+            panel.setTimerText(getSessionTimeFormatted());
+        }
+    }, 0, 1, TimeUnit.SECONDS);
+
+    if (client.getGameState() == GameState.LOGGED_IN && !dataLoaded)
+    {
+        clientThread.invokeLater(this::loadData);
+    }
+}
 
 	@Override
 	protected void shutDown()
