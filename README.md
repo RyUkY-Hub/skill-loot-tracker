@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/badge/RuneLite-Plugin%20Hub-17191c?style=for-the-badg" />
   </a>
   <img src="https://img.shields.io/badge/License-BSD%202--Clause-blue?style=for-the-badg" />
-  <img src="https://img.shields.io/badge/Version-2.5.0-success?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Version-2.5.0-success?style=for-the-badg" />
 </p>
 
 ### Screenshots
