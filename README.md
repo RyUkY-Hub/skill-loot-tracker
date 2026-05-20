@@ -19,9 +19,9 @@
 
 ### Screenshots
 <p align="center">
-  <img src="https://imgur.com/A7mKKHM" alt="Side Panel View" width="197" />
-  <img src="https://imgur.com/J6hsifE" alt="In-Game Overlay" width="251" />
-  <img src="https://imgur.com/K6BSS0s" alt="image" width="200" />
+  <img src="https://i.imgur.com/A7mKKHM" alt="Side Panel View" width="197" />
+  <img src="https://i.imgur.com/J6hsifE" alt="In-Game Overlay" width="251" />
+  <img src="https://i.imgur.com/K6BSS0s" alt="image" width="200" />
 </p>
 
 ## Overview
