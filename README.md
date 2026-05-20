@@ -1,5 +1,5 @@
-<p align="center">
-  <img width="400" height="400" alt="skillingloot-icon" src="https://github.com/user-attachments/assets/a5e1b187-dc15-42b5-8fa7-92f5426e88a4" />
+[<p align="center">
+  <img width="400" height="400" alt="skillingloot-icon" src="https://i.i.imgur.com/1wrBLhU.png" />
 </p>
 
 <h1 align="center">Skilling Loot Tracker v2.5.0</h1>
@@ -11,17 +11,17 @@
 
 <p align="center">
   <a href="https://runelite.net/plugin-hub">
-    <img src="https://img.shields.io/badge/RuneLite-Plugin%20Hub-17191c?style=for-the-badge" />
+    <img src="https://i.img.shields.io/badge/RuneLite-Plugin%20Hub-17191c?style=for-the-badg" />
   </a>
-  <img src="https://img.shields.io/badge/License-BSD%202--Clause-blue?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Version-2.5.0-success?style=for-the-badge" />
+  <img src="https://i.img.shields.io/badge/License-BSD%202--Clause-blue?style=for-the-badg" />
+  <img src="https://i.img.shields.io/badge/Version-2.5.0-success?style=for-the-badge" />
 </p>
 
 ### Screenshots
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6457febd-2b5b-4a6a-b0ed-94f7ea7c51da" alt="Side Panel View" width="197" />
-  <img src="https://github.com/user-attachments/assets/5cf66b1c-1628-4fb8-a092-5899345dfc6c" alt="In-Game Overlay" width="251" />
-  <img src="https://github.com/user-attachments/assets/f2c388cc-3d57-427e-8011-f04247dbb410" alt="image" width="200" />
+  <img src="https://i.imgur.com/A7mKKHM" alt="Side Panel View" width="197" />
+  <img src="https://i.imgur.com/J6hsifE" alt="In-Game Overlay" width="251" />
+  <img src="https://i.imgur.com/K6BSS0s" alt="image" width="200" />
 </p>
 
 ## Overview
