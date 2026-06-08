@@ -279,6 +279,18 @@ public class SkillLootTrackerPanel extends PluginPanel
 		});
 	}
 
+	/**
+	 * Removes a single item from the named category box without clearing
+	 * the whole box.  Called when the user right-click → "Ignore" an item.
+	 */
+	public void removeItem(int itemId, String category)
+	{
+		LootBox box = boxes.get(category);
+		if (box == null) return;
+		SwingUtilities.invokeLater(() -> box.updateItem(
+				itemId, 0, "0", "0", "", 0L, 0L));
+	}
+
 	public void resetAll()
 	{
 		// BUG FIX: must call invokeLater — original code mutated Swing components off EDT
@@ -506,8 +518,8 @@ public class SkillLootTrackerPanel extends PluginPanel
 				content.add(qtyLabel);
 				newBox.add(content, BorderLayout.CENTER);
 
-				// Tooltip refreshes on hover so gp/hr reflects current session time
-				MouseAdapter tooltipUpdater = new MouseAdapter()
+				// Combined tooltip refresh + right-click context menu
+				MouseAdapter itemInteractionAdapter = new MouseAdapter()
 				{
 					@Override
 					public void mouseEntered(MouseEvent e)
@@ -524,12 +536,139 @@ public class SkillLootTrackerPanel extends PluginPanel
 						iconLabel.setToolTipText(tip);
 						qtyLabel.setToolTipText(tip);
 					}
+
+					@Override
+					public void mousePressed(MouseEvent e)
+					{
+						if (e.isPopupTrigger()) showContextMenu(e, id, itemName);
+					}
+
+					@Override
+					public void mouseReleased(MouseEvent e)
+					{
+						// mouseReleased needed on Windows — popup trigger fires here
+						if (e.isPopupTrigger()) showContextMenu(e, id, itemName);
+					}
+
+					private void showContextMenu(MouseEvent e, int itemId, String name)
+					{
+						JPopupMenu menu = new JPopupMenu();
+						menu.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+						menu.setBorder(BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR, 1));
+
+						boolean alreadyIgnored = plugin.isItemIgnored(itemId);
+						boolean alwaysIgnored  = plugin.isItemAlwaysIgnored(itemId);
+
+						if (!alreadyIgnored)
+						{
+							// ---- Ignore item ----
+							JMenuItem ignoreItem = new JMenuItem("Ignore: " + name);
+							ignoreItem.setFont(FontManager.getRunescapeSmallFont());
+							ignoreItem.setForeground(new Color(255, 100, 100));
+							ignoreItem.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+							ignoreItem.setOpaque(true);
+							ignoreItem.addActionListener(ev -> {
+								int confirm = JOptionPane.showConfirmDialog(
+										SkillLootTrackerPanel.this,
+										"<html>Ignore <b>" + name + "</b>?<br>"
+												+ "It will be removed from tracked loot and won't be tracked again.<br><br>"
+												+ "To track it again later, go to:<br>"
+												+ "<b>Skilling Loot Tracker settings → Ignored items</b><br>"
+												+ "and remove it from the list.</html>",
+										"Ignore Item",
+										JOptionPane.YES_NO_OPTION,
+										JOptionPane.WARNING_MESSAGE
+								);
+								if (confirm == JOptionPane.YES_OPTION)
+								{
+									plugin.addToIgnoreList(itemId);
+								}
+							});
+							styleMenuItem(ignoreItem);
+							menu.add(ignoreItem);
+						}
+						else
+						{
+							if (alwaysIgnored)
+							{
+								// ---- Always-ignored: show greyed-out info ----
+								JMenuItem lockedItem = new JMenuItem("Always ignored: " + name);
+								lockedItem.setFont(FontManager.getRunescapeSmallFont());
+								lockedItem.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+								lockedItem.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+								lockedItem.setOpaque(true);
+								lockedItem.setEnabled(false);
+								menu.add(lockedItem);
+							}
+							else
+							{
+								// ---- Un-ignore item ----
+								JMenuItem unignoreItem = new JMenuItem("Un-ignore: " + name);
+								unignoreItem.setFont(FontManager.getRunescapeSmallFont());
+								unignoreItem.setForeground(new Color(126, 255, 126));
+								unignoreItem.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+								unignoreItem.setOpaque(true);
+								unignoreItem.addActionListener(ev ->
+										plugin.removeFromIgnoreList(itemId));
+								styleMenuItem(unignoreItem);
+								menu.add(unignoreItem);
+							}
+						}
+
+						// ---- Always present: view on wiki ----
+						JSeparator sep = new JSeparator();
+						sep.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+						sep.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+						menu.add(sep);
+
+						JMenuItem wikiItem = new JMenuItem("Wiki: " + name);
+						wikiItem.setFont(FontManager.getRunescapeSmallFont());
+						wikiItem.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+						wikiItem.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+						wikiItem.setOpaque(true);
+						wikiItem.addActionListener(ev -> {
+							try
+							{
+								String encoded = java.net.URLEncoder.encode(name, "UTF-8")
+										.replace("+", "_");
+								java.awt.Desktop.getDesktop().browse(
+										java.net.URI.create(
+												"https://oldschool.runescape.wiki/w/" + encoded));
+							}
+							catch (Exception ex)
+							{
+								ex.printStackTrace(); // at least shows up in IDE/client logs
+							}
+						});
+						styleMenuItem(wikiItem);
+						menu.add(wikiItem);
+
+						menu.show(e.getComponent(), e.getX(), e.getY());
+					}
+
+					/** Applies hover highlight to a menu item. */
+					private void styleMenuItem(JMenuItem item)
+					{
+						item.addMouseListener(new MouseAdapter()
+						{
+							@Override
+							public void mouseEntered(MouseEvent e)
+							{
+								item.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
+							}
+							@Override
+							public void mouseExited(MouseEvent e)
+							{
+								item.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+							}
+						});
+					}
 				};
 
-				newBox.addMouseListener(tooltipUpdater);
-				content.addMouseListener(tooltipUpdater);
-				iconLabel.addMouseListener(tooltipUpdater);
-				qtyLabel.addMouseListener(tooltipUpdater);
+				newBox.addMouseListener(itemInteractionAdapter);
+				content.addMouseListener(itemInteractionAdapter);
+				iconLabel.addMouseListener(itemInteractionAdapter);
+				qtyLabel.addMouseListener(itemInteractionAdapter);
 
 				itemGrid.add(newBox);
 				return newBox;

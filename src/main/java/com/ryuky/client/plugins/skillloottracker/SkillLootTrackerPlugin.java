@@ -962,6 +962,108 @@ public class SkillLootTrackerPlugin extends Plugin
 		}
 	}
 
+	/**
+	 * Adds an item ID to the user-editable ignore list in config and immediately
+	 * updates the working customIgnoreIds set so the item stops being tracked.
+	 * Also removes that item from all tracked loot categories and refreshes the panel.
+	 *
+	 * @param itemId the canonical item ID to ignore
+	 */
+	public void addToIgnoreList(int itemId)
+	{
+		// Add to the live set immediately so isIgnored() returns true right away
+		customIgnoreIds.add(itemId);
+
+		// Persist into config (append to the comma-separated text field)
+		String current = config.ignoreItemIds();
+		String idStr = String.valueOf(itemId);
+		String updated;
+		if (current == null || current.isBlank())
+		{
+			updated = idStr;
+		}
+		else
+		{
+			// Avoid duplicates in the saved string
+			boolean alreadySaved = Arrays.stream(current.split(","))
+					.map(String::trim)
+					.anyMatch(idStr::equals);
+			updated = alreadySaved ? current : current + "," + idStr;
+		}
+		configManager.setConfiguration("skillloottracker", "ignoreItemIds", updated);
+
+		// Remove the item from all tracked categories and refresh the panel
+		boolean anyRemoved = false;
+		for (Map.Entry<String, Map<Integer, Integer>> catEntry : lootPerSkill.entrySet())
+		{
+			if (catEntry.getValue().remove(itemId) != null)
+			{
+				anyRemoved = true;
+			}
+		}
+
+		if (anyRemoved)
+		{
+			// Tell each loot box to remove this item (qty = 0 triggers removal)
+			for (Map.Entry<String, Map<Integer, Integer>> catEntry : lootPerSkill.entrySet())
+			{
+				String category = catEntry.getKey();
+				panel.removeItem(itemId, category);
+			}
+			updatePanelTotals();
+			saveData();
+		}
+
+		log.debug("Skill Loot Tracker: added item {} to ignore list", itemId);
+	}
+
+	/**
+	 * Removes an item ID from the user-editable ignore list in config and rebuilds
+	 * the working ignore set. Does NOT retroactively add the item back to tracked loot.
+	 *
+	 * @param itemId the canonical item ID to un-ignore
+	 */
+	public void removeFromIgnoreList(int itemId)
+	{
+		String current = config.ignoreItemIds();
+		if (current == null || current.isBlank())
+		{
+			customIgnoreIds.remove(itemId);
+			return;
+		}
+
+		String idStr = String.valueOf(itemId);
+		String updated = Arrays.stream(current.split(","))
+				.map(String::trim)
+				.filter(s -> !s.isEmpty() && !s.equals(idStr))
+				.reduce((a, b) -> a + "," + b)
+				.orElse("");
+
+		configManager.setConfiguration("skillloottracker", "ignoreItemIds", updated);
+		// Rebuild the full set so ALWAYS_IGNORE entries are still respected
+		rebuildCustomIgnoreList();
+
+		log.debug("Skill Loot Tracker: removed item {} from ignore list", itemId);
+	}
+
+	/**
+	 * Returns true if the item is currently in the active ignore set.
+	 * Used by the panel to toggle the context-menu label.
+	 */
+	public boolean isItemIgnored(int itemId)
+	{
+		return customIgnoreIds.contains(itemId);
+	}
+
+	/**
+	 * Returns true if the item is in the ALWAYS_IGNORE hardcoded set,
+	 * meaning it cannot be un-ignored via the right-click menu.
+	 */
+	public boolean isItemAlwaysIgnored(int itemId)
+	{
+		return ALWAYS_IGNORE_IDS.contains(itemId) || BIRD_NEST_IDS.contains(itemId);
+	}
+
 	private void resumeSession()
 	{
 		if (!sessionActive && dataLoaded.get() && config.enableTimer() && !config.pauseTimer())
