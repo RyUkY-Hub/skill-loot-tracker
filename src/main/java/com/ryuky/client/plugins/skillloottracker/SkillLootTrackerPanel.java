@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package net.runelite.client.plugins.skillloottracker;
+package com.ryuky.client.plugins.skillloottracker;
 
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.SpriteID;
@@ -623,20 +623,17 @@ public class SkillLootTrackerPanel extends PluginPanel
 						// ---- Always present: view on wiki ----
 						JSeparator sep = new JSeparator();
 						sep.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
-						sep.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 						menu.add(sep);
 
 						JMenuItem wikiItem = new JMenuItem("Wiki: " + name);
 						wikiItem.setFont(FontManager.getRunescapeSmallFont());
-						wikiItem.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-						wikiItem.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-						wikiItem.setOpaque(true);
 						wikiItem.addActionListener(ev -> {
 							String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8)
 									.replace("+", "_")
-									.replace("%28", "(")
-									.replace("%29", ")")
-									.replace("%27", "'");
+									.replace("%28", "(") // keep ( unencoded - wiki uses it
+									.replace("%29", ")") // keep ) unencoded
+									.replace("%27", "'"); // keep ' unencoded - Zamorak's, etc
+
 							LinkBrowser.browse("https://oldschool.runescape.wiki/w/" + encoded);
 						});
 						styleMenuItem(wikiItem);
