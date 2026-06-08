@@ -630,10 +630,9 @@ public class SkillLootTrackerPanel extends PluginPanel
 						wikiItem.addActionListener(ev -> {
 							String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8)
 									.replace("+", "_")
-									.replace("%28", "(") // keep ( unencoded - wiki uses it
-									.replace("%29", ")") // keep ) unencoded
-									.replace("%27", "'"); // keep ' unencoded - Zamorak's, etc
-
+									.replace("%28", "(")
+									.replace("%29", ")")
+									.replace("%27", "'");
 							LinkBrowser.browse("https://oldschool.runescape.wiki/w/" + encoded);
 						});
 						styleMenuItem(wikiItem);
