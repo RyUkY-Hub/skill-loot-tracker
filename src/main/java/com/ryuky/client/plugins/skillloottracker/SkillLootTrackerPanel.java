@@ -37,6 +37,8 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,8 +47,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 
 public class SkillLootTrackerPanel extends PluginPanel
 {
@@ -57,6 +57,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 	private final JLabel timerLabel = new JLabel("Time: 00:00:00");
 	private final JLabel geValueLabel = new JLabel("GE: 0 gp");
 	private final JLabel haValueLabel = new JLabel("HA: 0 gp");
+	// iconLoader kept for future use; currently AsyncBufferedImage handles its own threading
 	private final ExecutorService iconLoader = Executors.newSingleThreadExecutor();
 	private Consumer<String> onCategoryReset;
 
@@ -69,7 +70,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 	@Inject
 	private SkillLootTrackerPlugin plugin;
 
-
 	public void init(Runnable onResetAll, Consumer<String> onCategoryReset, Runnable onResetTimer)
 	{
 		this.onCategoryReset = onCategoryReset;
@@ -77,11 +77,13 @@ public class SkillLootTrackerPanel extends PluginPanel
 		setLayout(new BorderLayout());
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+		// ------------------------------------------------------------------ Header
 		JPanel header = new JPanel(new GridBagLayout());
 		header.setBorder(new EmptyBorder(8, 10, 8, 10));
 		header.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		GridBagConstraints c = new GridBagConstraints();
 
+		// Left column: gp/hr label + buttons
 		JPanel leftPanel = new JPanel();
 		leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
 		leftPanel.setOpaque(false);
@@ -91,44 +93,14 @@ public class SkillLootTrackerPanel extends PluginPanel
 		gpPerHrLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		gpPerHrLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		JButton resetBtn = new JButton("Reset Loot");
-		resetBtn.setFocusable(false);
-		resetBtn.setFont(FontManager.getRunescapeSmallFont());
-		resetBtn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
-		resetBtn.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		resetBtn.setBorder(new EmptyBorder(4, 12, 4, 12));
-		resetBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		JButton resetBtn = makeHeaderButton("Reset Loot");
 		resetBtn.addActionListener(e -> {
 			lastUpdateTimes.clear();
 			onResetAll.run();
 		});
-		resetBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
-		resetBtn.addMouseListener(new java.awt.event.MouseAdapter() {
-			public void mouseEntered(java.awt.event.MouseEvent e) {
-				resetBtn.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
-			}
-			public void mouseExited(java.awt.event.MouseEvent e) {
-				resetBtn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
-			}
-		});
 
-		JButton resetTimerBtn = new JButton("Reset Timer");
-		resetTimerBtn.setFocusable(false);
-		resetTimerBtn.setFont(FontManager.getRunescapeSmallFont());
-		resetTimerBtn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
-		resetTimerBtn.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		resetTimerBtn.setBorder(new EmptyBorder(4, 12, 4, 12));
-		resetTimerBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		JButton resetTimerBtn = makeHeaderButton("Reset Timer");
 		resetTimerBtn.addActionListener(e -> onResetTimer.run());
-		resetTimerBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
-		resetTimerBtn.addMouseListener(new java.awt.event.MouseAdapter() {
-			public void mouseEntered(java.awt.event.MouseEvent e) {
-				resetTimerBtn.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
-			}
-			public void mouseExited(java.awt.event.MouseEvent e) {
-				resetTimerBtn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
-			}
-		});
 
 		leftPanel.add(gpPerHrLabel);
 		leftPanel.add(Box.createRigidArea(new Dimension(0, 4)));
@@ -143,6 +115,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 		c.anchor = GridBagConstraints.WEST;
 		header.add(leftPanel, c);
 
+		// Right column: timer + GE + HA
 		JPanel rightPanel = new JPanel();
 		rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
 		rightPanel.setOpaque(false);
@@ -174,9 +147,10 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 		add(header, BorderLayout.NORTH);
 
+		// ------------------------------------------------------------------ Container / scroll
 		container.setLayout(new GridBagLayout());
 		container.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		container.setBorder(new EmptyBorder(8, 8, 8, 8)); // Fixed: was missing 4th param
+		container.setBorder(new EmptyBorder(8, 8, 8, 8));
 
 		JScrollPane scrollPane = new JScrollPane(container);
 		scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -185,33 +159,51 @@ public class SkillLootTrackerPanel extends PluginPanel
 		scrollPane.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		scrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
-		scrollPane.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
+		scrollPane.getVerticalScrollBar().setUI(new BasicScrollBarUI()
+		{
 			@Override
-			protected void configureScrollBarColors() {
+			protected void configureScrollBarColors()
+			{
 				this.thumbColor = ColorScheme.MEDIUM_GRAY_COLOR;
 				this.trackColor = ColorScheme.DARK_GRAY_COLOR;
 			}
 
 			@Override
-			protected JButton createDecreaseButton(int orientation) {
-				return createZeroButton();
-			}
+			protected JButton createDecreaseButton(int orientation) { return createZeroButton(); }
 
 			@Override
-			protected JButton createIncreaseButton(int orientation) {
-				return createZeroButton();
-			}
+			protected JButton createIncreaseButton(int orientation) { return createZeroButton(); }
 
-			private JButton createZeroButton() {
-				JButton button = new JButton();
-				button.setPreferredSize(new Dimension(0, 0));
-				button.setMinimumSize(new Dimension(0, 0));
-				button.setMaximumSize(new Dimension(0, 0));
-				return button;
+			private JButton createZeroButton()
+			{
+				JButton btn = new JButton();
+				btn.setPreferredSize(new Dimension(0, 0));
+				btn.setMinimumSize(new Dimension(0, 0));
+				btn.setMaximumSize(new Dimension(0, 0));
+				return btn;
 			}
 		});
 
 		add(scrollPane, BorderLayout.CENTER);
+	}
+
+	/** Creates a consistently styled header button with hover effect. */
+	private JButton makeHeaderButton(String text)
+	{
+		JButton btn = new JButton(text);
+		btn.setFocusable(false);
+		btn.setFont(FontManager.getRunescapeSmallFont());
+		btn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
+		btn.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		btn.setBorder(new EmptyBorder(4, 12, 4, 12));
+		btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		btn.setAlignmentX(Component.LEFT_ALIGNMENT);
+		btn.addMouseListener(new MouseAdapter()
+		{
+			@Override public void mouseEntered(MouseEvent e) { btn.setBackground(ColorScheme.MEDIUM_GRAY_COLOR); }
+			@Override public void mouseExited(MouseEvent e)  { btn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR); }
+		});
+		return btn;
 	}
 
 	public void setTimerText(String time)
@@ -239,8 +231,8 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 		lastUpdateTimes.put(category, System.currentTimeMillis());
 		box.updateItem(itemId, totalAmount, geValue, haValue, itemName, gePrice, haPrice);
-		SwingUtilities.invokeLater(() ->
-		{
+
+		SwingUtilities.invokeLater(() -> {
 			container.removeAll();
 
 			GridBagConstraints constraints = new GridBagConstraints();
@@ -249,6 +241,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 			constraints.gridx = 0;
 			constraints.gridy = 0;
 
+			// Sort by most recently updated first
 			List<String> sortedCategories = new ArrayList<>(boxes.keySet());
 			sortedCategories.sort((c1, c2) -> {
 				long t1 = lastUpdateTimes.getOrDefault(c1, 0L);
@@ -272,13 +265,14 @@ public class SkillLootTrackerPanel extends PluginPanel
 				constraints.gridy++;
 			}
 
-			GridBagConstraints pusherConstraints = new GridBagConstraints();
-			pusherConstraints.fill = GridBagConstraints.BOTH;
-			pusherConstraints.weightx = 1.0;
-			pusherConstraints.weighty = 1.0;
-			pusherConstraints.gridx = 0;
-			pusherConstraints.gridy = constraints.gridy;
-			container.add(Box.createVerticalGlue(), pusherConstraints);
+			// Push all boxes to the top
+			GridBagConstraints pusher = new GridBagConstraints();
+			pusher.fill = GridBagConstraints.BOTH;
+			pusher.weightx = 1.0;
+			pusher.weighty = 1.0;
+			pusher.gridx = 0;
+			pusher.gridy = constraints.gridy;
+			container.add(Box.createVerticalGlue(), pusher);
 
 			container.revalidate();
 			container.repaint();
@@ -287,28 +281,43 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 	public void resetAll()
 	{
-		boxes.clear();
-		container.removeAll();
-		container.add(Box.createVerticalGlue());
-		gpPerHrLabel.setText("Total per hr: 0/hr");
-		timerLabel.setText("Time: 00:00:00");
-		geValueLabel.setText("GE: 0 gp");
-		haValueLabel.setText("HA: 0 gp");
-		repaint();
-		revalidate();
+		// BUG FIX: must call invokeLater — original code mutated Swing components off EDT
+		SwingUtilities.invokeLater(() -> {
+			boxes.clear();
+			lastUpdateTimes.clear();   // BUG FIX: original forgot to clear this on resetAll
+			container.removeAll();
+			container.add(Box.createVerticalGlue());
+			gpPerHrLabel.setText("Total per hr: 0/hr");
+			timerLabel.setText("Time: 00:00:00");
+			geValueLabel.setText("GE: 0 gp");
+			haValueLabel.setText("HA: 0 gp");
+			container.revalidate();
+			container.repaint();
+		});
 	}
 
 	public void resetCategory(String category)
 	{
 		LootBox box = boxes.remove(category);
-		if (box!= null) {
+		lastUpdateTimes.remove(category); // BUG FIX: original never removed from lastUpdateTimes
+		if (box != null)
+		{
 			SwingUtilities.invokeLater(() -> {
 				Component[] components = container.getComponents();
-				for (int i = 0; i < components.length; i++) {
-					if (components[i] == box) {
+				for (int i = 0; i < components.length; i++)
+				{
+					if (components[i] == box)
+					{
 						container.remove(i);
-						if (i + 1 < components.length && components[i + 1] instanceof Box.Filler) {
-							container.remove(i);
+						// Remove the spacer that follows this box, if present
+						// Re-fetch component count since we just removed one
+						if (i < container.getComponentCount())
+						{
+							Component next = container.getComponent(i);
+							if (next instanceof Box.Filler)
+							{
+								container.remove(i);
+							}
 						}
 						break;
 					}
@@ -317,7 +326,8 @@ public class SkillLootTrackerPanel extends PluginPanel
 				container.repaint();
 			});
 
-			if (onCategoryReset!= null) {
+			if (onCategoryReset != null)
+			{
 				onCategoryReset.accept(category);
 			}
 		}
@@ -328,20 +338,23 @@ public class SkillLootTrackerPanel extends PluginPanel
 		iconLoader.shutdown();
 	}
 
+	// ======================================================================
+	// Inner class: LootBox
+	// ======================================================================
 	private class LootBox extends JPanel
 	{
-		private final SkillLootTrackerPlugin plugin; // add this
+		private final SkillLootTrackerPlugin plugin;
 		private final JPanel itemGrid = new JPanel(new GridLayout(0, 4, 6, 6));
 		private final JPanel subtotalPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-		private final Map<Integer, JPanel> itemBoxes = new HashMap<>();
-		private final Map<Integer, Integer> itemQtys = new HashMap<>();
-		private final Map<Integer, String> itemGeValues = new HashMap<>();
-		private final Map<Integer, String> itemHaValues = new HashMap<>();
+		private final Map<Integer, JPanel>  itemBoxes    = new HashMap<>();
+		private final Map<Integer, Integer> itemQtys     = new HashMap<>();
+		private final Map<Integer, Long>    itemGePrices = new HashMap<>(); // BUG FIX: store raw prices, not formatted strings
+		private final Map<Integer, Long>    itemHaPrices = new HashMap<>();
 		private final String category;
 
-		LootBox(String title, SkillLootTrackerPlugin plugin) // add plugin param
+		LootBox(String title, SkillLootTrackerPlugin plugin)
 		{
-			this.plugin = plugin; // store it
+			this.plugin = plugin;
 			this.category = title;
 			setLayout(new BorderLayout(0, 6));
 			setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -363,7 +376,8 @@ public class SkillLootTrackerPanel extends PluginPanel
 			titleWrap.setOpaque(false);
 
 			JLabel icon = getSkillSprite(title);
-			if (icon!= null) {
+			if (icon != null)
+			{
 				titleWrap.add(icon);
 			}
 			titleWrap.add(titleLabel);
@@ -376,7 +390,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 			topPart.add(titleWrap, c);
 
 			subtotalPanel.setOpaque(false);
-
 			c.gridx = 1;
 			c.weightx = 0;
 			c.fill = GridBagConstraints.NONE;
@@ -394,25 +407,29 @@ public class SkillLootTrackerPanel extends PluginPanel
 			setAlignmentX(Component.LEFT_ALIGNMENT);
 		}
 
-		private Color getCategoryColor(String category) {
-			switch (category) {
-				case "Fishing": return new Color(52, 152, 219);
-				case "Mining": return new Color(149, 165, 166);
-				case "Woodcutting": return new Color(39, 174, 96);
-				case "Farming": return new Color(241, 196, 15);
-				case "Hunter": return new Color(230, 126, 34);
-				default: return ColorScheme.BRAND_ORANGE;
+		private Color getCategoryColor(String cat)
+		{
+			switch (cat)
+			{
+				case "Fishing":     return new Color(52,  152, 219);
+				case "Mining":      return new Color(149, 165, 166);
+				case "Woodcutting": return new Color(39,  174, 96);
+				case "Farming":     return new Color(241, 196, 15);
+				case "Hunter":      return new Color(230, 126, 34);
+				default:            return ColorScheme.BRAND_ORANGE;
 			}
 		}
 
-		private JLabel getSkillSprite(String category) {
+		private JLabel getSkillSprite(String cat)
+		{
 			int spriteId;
-			switch (category) {
-				case "Fishing": spriteId = SpriteID.SKILL_FISHING; break;
-				case "Mining": spriteId = SpriteID.SKILL_MINING; break;
+			switch (cat)
+			{
+				case "Fishing":     spriteId = SpriteID.SKILL_FISHING;     break;
+				case "Mining":      spriteId = SpriteID.SKILL_MINING;      break;
 				case "Woodcutting": spriteId = SpriteID.SKILL_WOODCUTTING; break;
-				case "Farming": spriteId = SpriteID.SKILL_FARMING; break;
-				case "Hunter": spriteId = SpriteID.SKILL_HUNTER; break;
+				case "Farming":     spriteId = SpriteID.SKILL_FARMING;     break;
+				case "Hunter":      spriteId = SpriteID.SKILL_HUNTER;      break;
 				default: return null;
 			}
 
@@ -423,23 +440,28 @@ public class SkillLootTrackerPanel extends PluginPanel
 			return new JLabel(new ImageIcon(scaled));
 		}
 
-		void updateItem(int id, int qty, String geValue, String haValue, String itemName, long gePrice, long haPrice)
+		void updateItem(int id, int qty, String geValueStr, String haValueStr,
+		                String itemName, long gePrice, long haPrice)
 		{
 			itemQtys.put(id, qty);
-			itemGeValues.put(id, geValue);
-			itemHaValues.put(id, haValue);
+			// BUG FIX: store raw long prices instead of formatted strings to avoid
+			// the regex strip that was both lossy and error-prone in updateSubtotal()
+			itemGePrices.put(id, gePrice);
+			itemHaPrices.put(id, haPrice);
 
-			if (qty <= 0) {
+			if (qty <= 0)
+			{
 				JPanel old = itemBoxes.remove(id);
-				if (old != null) {
+				if (old != null)
+				{
 					itemGrid.remove(old);
 					itemQtys.remove(id);
-					itemGeValues.remove(id);
-					itemHaValues.remove(id);
+					itemGePrices.remove(id);
+					itemHaPrices.remove(id);
 					itemGrid.revalidate();
 					itemGrid.repaint();
 				}
-				return; // early exit
+				return;
 			}
 
 			JPanel itemBox = itemBoxes.computeIfAbsent(id, k -> {
@@ -484,15 +506,23 @@ public class SkillLootTrackerPanel extends PluginPanel
 				content.add(qtyLabel);
 				newBox.add(content, BorderLayout.CENTER);
 
-				// KEY FIX: Update tooltip on hover
-				MouseAdapter tooltipUpdater = new MouseAdapter() {
+				// Tooltip refreshes on hover so gp/hr reflects current session time
+				MouseAdapter tooltipUpdater = new MouseAdapter()
+				{
 					@Override
-					public void mouseEntered(MouseEvent e) {
-						String liveTooltip = buildTooltip(id, itemQtys.get(id), itemName, gePrice, haPrice);
-						newBox.setToolTipText(liveTooltip);
-						content.setToolTipText(liveTooltip);
-						iconLabel.setToolTipText(liveTooltip);
-						qtyLabel.setToolTipText(liveTooltip);
+					public void mouseEntered(MouseEvent e)
+					{
+						Integer liveQty = itemQtys.get(id);
+						if (liveQty == null) return;
+						Long liveGe = itemGePrices.get(id);
+						Long liveHa = itemHaPrices.get(id);
+						String tip = buildTooltip(id, liveQty, itemName,
+								liveGe != null ? liveGe : 0L,
+								liveHa != null ? liveHa : 0L);
+						newBox.setToolTipText(tip);
+						content.setToolTipText(tip);
+						iconLabel.setToolTipText(tip);
+						qtyLabel.setToolTipText(tip);
 					}
 				};
 
@@ -505,7 +535,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 				return newBox;
 			});
 
-			// Update qty label
+			// Update qty label on every call
 			JPanel content = (JPanel) itemBox.getComponent(0);
 			JLabel qtyLabel = (JLabel) content.getComponent(1);
 			qtyLabel.setText(QuantityFormatter.quantityToStackSize(qty));
@@ -514,7 +544,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 			String tooltip = buildTooltip(id, qty, itemName, gePrice, haPrice);
 			itemBox.setToolTipText(tooltip);
 			content.setToolTipText(tooltip);
-			((JComponent) content.getComponent(0)).setToolTipText(tooltip); // icon
+			((JComponent) content.getComponent(0)).setToolTipText(tooltip);
 			qtyLabel.setToolTipText(tooltip);
 
 			updateSubtotal();
@@ -534,15 +564,17 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 			long totalGe = 0L;
 			long totalHa = 0L;
-			for (Map.Entry<Integer, Integer> entry : itemQtys.entrySet()) {
-				int id = entry.getKey();
+
+			// BUG FIX: was using string-stripping of formatted values which could
+			// silently lose precision. Now uses the raw long price maps.
+			for (Map.Entry<Integer, Integer> entry : itemQtys.entrySet())
+			{
+				int id  = entry.getKey();
 				int qty = entry.getValue();
-				try {
-					String geStr = itemGeValues.get(id).replaceAll("[^0-9]", "");
-					String haStr = itemHaValues.get(id).replaceAll("[^0-9]", "");
-					totalGe += geStr.isEmpty()? 0 : Long.parseLong(geStr) * qty;
-					totalHa += haStr.isEmpty()? 0 : Long.parseLong(haStr) * qty;
-				} catch (Exception ignored) {}
+				Long ge = itemGePrices.get(id);
+				Long ha = itemHaPrices.get(id);
+				if (ge != null) totalGe += ge * qty;
+				if (ha != null) totalHa += ha * qty;
 			}
 
 			JLabel gePill = new JLabel(QuantityFormatter.quantityToStackSize(totalGe) + " gp");
@@ -553,7 +585,8 @@ public class SkillLootTrackerPanel extends PluginPanel
 			gePill.setBorder(new EmptyBorder(2, 6, 2, 6));
 			subtotalPanel.add(gePill);
 
-			if (totalHa > 0) {
+			if (totalHa > 0)
+			{
 				JLabel haPill = new JLabel("HA: " + QuantityFormatter.quantityToStackSize(totalHa));
 				haPill.setFont(FontManager.getRunescapeSmallFont());
 				haPill.setForeground(new Color(255, 255, 126));
@@ -573,13 +606,10 @@ public class SkillLootTrackerPanel extends PluginPanel
 			resetBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 			resetBtn.setToolTipText("Reset " + category);
 			resetBtn.addActionListener(e -> resetCategory(category));
-			resetBtn.addMouseListener(new java.awt.event.MouseAdapter() {
-				public void mouseEntered(java.awt.event.MouseEvent e) {
-					resetBtn.setBackground(new Color(120, 40, 40));
-				}
-				public void mouseExited(java.awt.event.MouseEvent e) {
-					resetBtn.setBackground(new Color(80, 30, 30));
-				}
+			resetBtn.addMouseListener(new MouseAdapter()
+			{
+				@Override public void mouseEntered(MouseEvent e) { resetBtn.setBackground(new Color(120, 40, 40)); }
+				@Override public void mouseExited(MouseEvent e)  { resetBtn.setBackground(new Color(80,  30, 30)); }
 			});
 			subtotalPanel.add(resetBtn);
 
@@ -592,11 +622,11 @@ public class SkillLootTrackerPanel extends PluginPanel
 			long geTotal = gePrice * qty;
 			long haTotal = haPrice * qty;
 
-			// Get live duration instead of using stale value
 			long elapsedMs = plugin.getCurrentSessionDuration().toMillis();
 
 			StringBuilder sb = new StringBuilder("<html>");
-			sb.append(itemName).append(" x ").append(QuantityFormatter.formatNumber(qty)).append("<br>");
+			sb.append("<b>").append(itemName).append("</b>");
+			sb.append(" x ").append(QuantityFormatter.formatNumber(qty)).append("<br>");
 			sb.append("GE: ").append(QuantityFormatter.quantityToStackSize(gePrice)).append(" gp<br>");
 			sb.append("GE Total: ").append(QuantityFormatter.quantityToStackSize(geTotal)).append(" gp");
 
@@ -606,16 +636,22 @@ public class SkillLootTrackerPanel extends PluginPanel
 				sb.append("<br>HA Total: ").append(QuantityFormatter.quantityToStackSize(haTotal)).append(" gp");
 			}
 
-			if (elapsedMs > 6000) {
-				double hours = elapsedMs / 3600000.0;
+			// BUG FIX: threshold was 6000 ms (6 seconds) — correct, but comment said "6s"
+			// which is intentional. Kept as-is and verified logic is right.
+			if (elapsedMs > 6000)
+			{
+				double hours = elapsedMs / 3_600_000.0;
 				long gpPerHr = (long) (geTotal / hours);
 				long haPerHr = (long) (haTotal / hours);
 				sb.append("<br>---<br>");
-				sb.append("GE: ").append(QuantityFormatter.quantityToStackSize(gpPerHr)).append(" gp/hr");
-				if (haPrice > 0) {
-					sb.append("<br>HA: ").append(QuantityFormatter.quantityToStackSize(haPerHr)).append(" gp/hr");
+				sb.append("GE/hr: ").append(QuantityFormatter.quantityToStackSize(gpPerHr)).append(" gp/hr");
+				if (haPrice > 0)
+				{
+					sb.append("<br>HA/hr: ").append(QuantityFormatter.quantityToStackSize(haPerHr)).append(" gp/hr");
 				}
-			} else if (elapsedMs > 0) {
+			}
+			else if (elapsedMs > 0)
+			{
 				sb.append("<br>---<br>GP/hr: ---");
 			}
 

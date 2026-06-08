@@ -37,9 +37,7 @@ public class SkillLootTrackerOverlay extends OverlayPanel
     private final SkillLootTrackerConfig config;
 
     @Inject
-    public SkillLootTrackerOverlay(
-            SkillLootTrackerPlugin plugin,
-            SkillLootTrackerConfig config)
+    public SkillLootTrackerOverlay(SkillLootTrackerPlugin plugin, SkillLootTrackerConfig config)
     {
         super(plugin);
         this.plugin = plugin;
@@ -56,34 +54,33 @@ public class SkillLootTrackerOverlay extends OverlayPanel
         }
 
         panelComponent.getChildren().clear();
-
         panelComponent.setPreferredSize(new Dimension(220, 0));
         panelComponent.setGap(new Point(0, 2));
 
         panelComponent.getChildren().add(TitleComponent.builder()
                 .text("Skilling Loot Tracker")
-                .color(new Color(191, 64, 191)) // Bright electric purple
+                .color(new Color(191, 64, 191))
                 .build());
 
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Time:")
                 .leftColor(Color.LIGHT_GRAY)
                 .right(plugin.getSessionTimeFormatted())
-                .rightColor(new Color(225, 103, 0)) // Orange
+                .rightColor(new Color(225, 103, 0))
                 .build());
 
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("GE/hr:")
                 .leftColor(Color.LIGHT_GRAY)
                 .right(plugin.getGpPerHourFormatted())
-                .rightColor(new Color(126, 255, 126)) // Green
+                .rightColor(new Color(126, 255, 126))
                 .build());
 
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("HA/hr:")
                 .leftColor(Color.LIGHT_GRAY)
                 .right(plugin.getSessionHaPerHourFormatted())
-                .rightColor(new Color(255, 255, 126)) // Yellow
+                .rightColor(new Color(255, 255, 126))
                 .build());
 
         panelComponent.getChildren().add(LineComponent.builder()

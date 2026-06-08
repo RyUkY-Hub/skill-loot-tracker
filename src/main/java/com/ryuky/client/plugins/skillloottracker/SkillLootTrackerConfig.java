@@ -79,10 +79,51 @@ public interface SkillLootTrackerConfig extends Config
 	)
 	default boolean trackHunter() { return true; }
 
+	// -----------------------------------------------------------------------
+	// Ignore List
+	// -----------------------------------------------------------------------
+	@ConfigSection(
+			name = "Ignore List",
+			description = "Items to never track (comma-separated item IDs)",
+			position = 6,
+			closedByDefault = true
+	)
+	String ignoreSection = "ignoreSection";
+
+	@ConfigItem(
+			keyName = "ignoreItemIds",
+			name = "Ignored Item IDs",
+			description = "Comma-separated list of item IDs to never track (e.g. 526,995,1521)",
+			section = ignoreSection,
+			position = 0
+	)
+	default String ignoreItemIds() { return ""; }
+
+	@ConfigItem(
+			keyName = "ignoreCoins",
+			name = "Ignore Coins",
+			description = "Never track coins (item ID 995)",
+			section = ignoreSection,
+			position = 1
+	)
+	default boolean ignoreCoins() { return true; }
+
+	@ConfigItem(
+			keyName = "ignoreBirdNests",
+			name = "Ignore Bird Nests",
+			description = "Ignore bird nests (opened/random drops) — they are not from skilling directly",
+			section = ignoreSection,
+			position = 2
+	)
+	default boolean ignoreBirdNests() { return false; }
+
+	// -----------------------------------------------------------------------
+	// Session Timer
+	// -----------------------------------------------------------------------
 	@ConfigSection(
 			name = "Session Timer",
 			description = "Control the session timer",
-			position = 6
+			position = 7
 	)
 	String timerSection = "timerSection";
 
@@ -93,10 +134,7 @@ public interface SkillLootTrackerConfig extends Config
 			section = timerSection,
 			position = 0
 	)
-	default boolean enableTimer()
-	{
-		return true;
-	}
+	default boolean enableTimer() { return true; }
 
 	@ConfigItem(
 			keyName = "pauseTimer",
@@ -105,10 +143,7 @@ public interface SkillLootTrackerConfig extends Config
 			section = timerSection,
 			position = 1
 	)
-	default boolean pauseTimer()
-	{
-		return false;
-	}
+	default boolean pauseTimer() { return false; }
 
 	@ConfigItem(
 			keyName = "resetTimer",
@@ -117,8 +152,5 @@ public interface SkillLootTrackerConfig extends Config
 			section = timerSection,
 			position = 2
 	)
-	default boolean resetTimer()
-	{
-		return false;
-	}
+	default boolean resetTimer() { return false; }
 }
