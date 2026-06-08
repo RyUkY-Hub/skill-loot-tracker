@@ -637,7 +637,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 							}
 							catch (Exception ex)
 							{
-								ex.printStackTrace(); // at least shows up in IDE/client logs
 							}
 						});
 						styleMenuItem(wikiItem);
