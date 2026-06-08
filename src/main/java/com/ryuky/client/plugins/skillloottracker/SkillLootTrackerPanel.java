@@ -62,7 +62,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 	private final JLabel timerLabel = new JLabel("Time: 00:00:00");
 	private final JLabel geValueLabel = new JLabel("GE: 0 gp");
 	private final JLabel haValueLabel = new JLabel("HA: 0 gp");
-	// iconLoader kept for future use; currently AsyncBufferedImage handles its own threading
 	private final ExecutorService iconLoader = Executors.newSingleThreadExecutor();
 	private Consumer<String> onCategoryReset;
 
@@ -192,7 +191,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 		add(scrollPane, BorderLayout.CENTER);
 	}
 
-	/** Creates a consistently styled header button with hover effect. */
 	private JButton makeHeaderButton(String text)
 	{
 		JButton btn = new JButton(text);
@@ -246,7 +244,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 			constraints.gridx = 0;
 			constraints.gridy = 0;
 
-			// Sort by most recently updated first
 			List<String> sortedCategories = new ArrayList<>(boxes.keySet());
 			sortedCategories.sort((c1, c2) -> {
 				long t1 = lastUpdateTimes.getOrDefault(c1, 0L);
@@ -270,7 +267,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 				constraints.gridy++;
 			}
 
-			// Push all boxes to the top
 			GridBagConstraints pusher = new GridBagConstraints();
 			pusher.fill = GridBagConstraints.BOTH;
 			pusher.weightx = 1.0;
@@ -284,10 +280,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 		});
 	}
 
-	/**
-	 * Removes a single item from the named category box without clearing
-	 * the whole box. Called when the user right-click → "Ignore" an item.
-	 */
 	public void removeItem(int itemId, String category)
 	{
 		LootBox box = boxes.get(category);
@@ -298,10 +290,9 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 	public void resetAll()
 	{
-		// BUG FIX: must call invokeLater — original code mutated Swing components off EDT
 		SwingUtilities.invokeLater(() -> {
 			boxes.clear();
-			lastUpdateTimes.clear(); // BUG FIX: original forgot to clear this on resetAll
+			lastUpdateTimes.clear();
 			container.removeAll();
 			container.add(Box.createVerticalGlue());
 			gpPerHrLabel.setText("Total per hr: 0/hr");
@@ -316,7 +307,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 	public void resetCategory(String category)
 	{
 		LootBox box = boxes.remove(category);
-		lastUpdateTimes.remove(category); // BUG FIX: original never removed from lastUpdateTimes
+		lastUpdateTimes.remove(category);
 		if (box!= null)
 		{
 			SwingUtilities.invokeLater(() -> {
@@ -326,8 +317,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 					if (components[i] == box)
 					{
 						container.remove(i);
-						// Remove the spacer that follows this box, if present
-						// Re-fetch component count since we just removed one
 						if (i < container.getComponentCount())
 						{
 							Component next = container.getComponent(i);
@@ -355,9 +344,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 		iconLoader.shutdown();
 	}
 
-	// ======================================================================
-	// Inner class: LootBox
-	// ======================================================================
 	private class LootBox extends JPanel
 	{
 		private final SkillLootTrackerPlugin plugin;
@@ -365,7 +351,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 		private final JPanel subtotalPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
 		private final Map<Integer, JPanel> itemBoxes = new HashMap<>();
 		private final Map<Integer, Integer> itemQtys = new HashMap<>();
-		private final Map<Integer, Long> itemGePrices = new HashMap<>(); // BUG FIX: store raw prices, not formatted strings
+		private final Map<Integer, Long> itemGePrices = new HashMap<>();
 		private final Map<Integer, Long> itemHaPrices = new HashMap<>();
 		private final String category;
 
@@ -461,8 +447,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 		                String itemName, long gePrice, long haPrice)
 		{
 			itemQtys.put(id, qty);
-			// BUG FIX: store raw long prices instead of formatted strings to avoid
-			// the regex strip that was both lossy and error-prone in updateSubtotal()
 			itemGePrices.put(id, gePrice);
 			itemHaPrices.put(id, haPrice);
 
@@ -523,7 +507,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 				content.add(qtyLabel);
 				newBox.add(content, BorderLayout.CENTER);
 
-				// Combined tooltip refresh + right-click context menu
 				MouseAdapter itemInteractionAdapter = new MouseAdapter()
 				{
 					@Override
@@ -551,7 +534,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 					@Override
 					public void mouseReleased(MouseEvent e)
 					{
-						// mouseReleased needed on Windows — popup trigger fires here
 						if (e.isPopupTrigger()) showContextMenu(e, id, itemName);
 					}
 
@@ -566,7 +548,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 						if (!alreadyIgnored)
 						{
-							// ---- Ignore item ----
 							JMenuItem ignoreItem = new JMenuItem("Ignore: " + name);
 							ignoreItem.setFont(FontManager.getRunescapeSmallFont());
 							ignoreItem.setForeground(new Color(255, 100, 100));
@@ -596,7 +577,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 						{
 							if (alwaysIgnored)
 							{
-								// ---- Always-ignored: show greyed-out info ----
 								JMenuItem lockedItem = new JMenuItem("Always ignored: " + name);
 								lockedItem.setFont(FontManager.getRunescapeSmallFont());
 								lockedItem.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
@@ -607,7 +587,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 							}
 							else
 							{
-								// ---- Un-ignore item ----
 								JMenuItem unignoreItem = new JMenuItem("Un-ignore: " + name);
 								unignoreItem.setFont(FontManager.getRunescapeSmallFont());
 								unignoreItem.setForeground(new Color(126, 255, 126));
@@ -620,7 +599,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 							}
 						}
 
-						// ---- Always present: view on wiki ----
 						JSeparator sep = new JSeparator();
 						sep.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
 						menu.add(sep);
@@ -633,6 +611,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 									.replace("%28", "(")
 									.replace("%29", ")")
 									.replace("%27", "'");
+
 							LinkBrowser.browse("https://oldschool.runescape.wiki/w/" + encoded);
 						});
 						styleMenuItem(wikiItem);
@@ -641,7 +620,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 						menu.show(e.getComponent(), e.getX(), e.getY());
 					}
 
-					/** Applies hover highlight to a menu item. */
 					private void styleMenuItem(JMenuItem item)
 					{
 						item.addMouseListener(new MouseAdapter()
@@ -669,12 +647,10 @@ public class SkillLootTrackerPanel extends PluginPanel
 				return newBox;
 			});
 
-			// Update qty label on every call
 			JPanel content = (JPanel) itemBox.getComponent(0);
 			JLabel qtyLabel = (JLabel) content.getComponent(1);
 			qtyLabel.setText(QuantityFormatter.quantityToStackSize(qty));
 
-			// Set initial tooltip
 			String tooltip = buildTooltip(id, qty, itemName, gePrice, haPrice);
 			itemBox.setToolTipText(tooltip);
 			content.setToolTipText(tooltip);
@@ -699,8 +675,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 			long totalGe = 0L;
 			long totalHa = 0L;
 
-			// BUG FIX: was using string-stripping of formatted values which could
-			// silently lose precision. Now uses the raw long price maps.
 			for (Map.Entry<Integer, Integer> entry : itemQtys.entrySet())
 			{
 				int id = entry.getKey();
@@ -770,8 +744,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 				sb.append("<br>HA Total: ").append(QuantityFormatter.quantityToStackSize(haTotal)).append(" gp");
 			}
 
-			// BUG FIX: threshold was 6000 ms (6 seconds) — correct, but comment said "6s"
-			// which is intentional. Kept as-is and verified logic is right.
 			if (elapsedMs > 6000)
 			{
 				double hours = elapsedMs / 3_600_000.0;
