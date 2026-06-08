@@ -37,8 +37,6 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +45,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class SkillLootTrackerPanel extends PluginPanel
 {
@@ -103,11 +103,11 @@ public class SkillLootTrackerPanel extends PluginPanel
 			onResetAll.run();
 		});
 		resetBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
-		resetBtn.addMouseListener(new MouseAdapter() {
-			public void mouseEntered(MouseEvent e) {
+		resetBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+			public void mouseEntered(java.awt.event.MouseEvent e) {
 				resetBtn.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
 			}
-			public void mouseExited(MouseEvent e) {
+			public void mouseExited(java.awt.event.MouseEvent e) {
 				resetBtn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
 			}
 		});
@@ -121,11 +121,11 @@ public class SkillLootTrackerPanel extends PluginPanel
 		resetTimerBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		resetTimerBtn.addActionListener(e -> onResetTimer.run());
 		resetTimerBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
-		resetTimerBtn.addMouseListener(new MouseAdapter() {
-			public void mouseEntered(MouseEvent e) {
+		resetTimerBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+			public void mouseEntered(java.awt.event.MouseEvent e) {
 				resetTimerBtn.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
 			}
-			public void mouseExited(MouseEvent e) {
+			public void mouseExited(java.awt.event.MouseEvent e) {
 				resetTimerBtn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR);
 			}
 		});
@@ -573,11 +573,11 @@ public class SkillLootTrackerPanel extends PluginPanel
 			resetBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 			resetBtn.setToolTipText("Reset " + category);
 			resetBtn.addActionListener(e -> resetCategory(category));
-			resetBtn.addMouseListener(new MouseAdapter() {
-				public void mouseEntered(MouseEvent e) {
+			resetBtn.addMouseListener(new java.awt.event.MouseAdapter() {
+				public void mouseEntered(java.awt.event.MouseEvent e) {
 					resetBtn.setBackground(new Color(120, 40, 40));
 				}
-				public void mouseExited(MouseEvent e) {
+				public void mouseExited(java.awt.event.MouseEvent e) {
 					resetBtn.setBackground(new Color(80, 30, 30));
 				}
 			});
