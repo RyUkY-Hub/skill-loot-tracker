@@ -21,8 +21,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.ryuky.client.plugins.skillloottracker;
+package net.runelite.client.plugins.skillloottracker;
 
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.SpriteID;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
@@ -30,6 +31,7 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.AsyncBufferedImage;
+import net.runelite.client.util.LinkBrowser;
 import net.runelite.client.util.QuantityFormatter;
 
 import javax.inject.Inject;
@@ -40,6 +42,8 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +52,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
+@Slf4j
 public class SkillLootTrackerPanel extends PluginPanel
 {
 	private final Map<String, LootBox> boxes = new HashMap<>();
@@ -201,7 +206,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 		btn.addMouseListener(new MouseAdapter()
 		{
 			@Override public void mouseEntered(MouseEvent e) { btn.setBackground(ColorScheme.MEDIUM_GRAY_COLOR); }
-			@Override public void mouseExited(MouseEvent e)  { btn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR); }
+			@Override public void mouseExited(MouseEvent e) { btn.setBackground(ColorScheme.DARKER_GRAY_HOVER_COLOR); }
 		});
 		return btn;
 	}
@@ -281,7 +286,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 
 	/**
 	 * Removes a single item from the named category box without clearing
-	 * the whole box.  Called when the user right-click → "Ignore" an item.
+	 * the whole box. Called when the user right-click → "Ignore" an item.
 	 */
 	public void removeItem(int itemId, String category)
 	{
@@ -296,7 +301,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 		// BUG FIX: must call invokeLater — original code mutated Swing components off EDT
 		SwingUtilities.invokeLater(() -> {
 			boxes.clear();
-			lastUpdateTimes.clear();   // BUG FIX: original forgot to clear this on resetAll
+			lastUpdateTimes.clear(); // BUG FIX: original forgot to clear this on resetAll
 			container.removeAll();
 			container.add(Box.createVerticalGlue());
 			gpPerHrLabel.setText("Total per hr: 0/hr");
@@ -312,7 +317,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 	{
 		LootBox box = boxes.remove(category);
 		lastUpdateTimes.remove(category); // BUG FIX: original never removed from lastUpdateTimes
-		if (box != null)
+		if (box!= null)
 		{
 			SwingUtilities.invokeLater(() -> {
 				Component[] components = container.getComponents();
@@ -338,7 +343,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 				container.repaint();
 			});
 
-			if (onCategoryReset != null)
+			if (onCategoryReset!= null)
 			{
 				onCategoryReset.accept(category);
 			}
@@ -358,10 +363,10 @@ public class SkillLootTrackerPanel extends PluginPanel
 		private final SkillLootTrackerPlugin plugin;
 		private final JPanel itemGrid = new JPanel(new GridLayout(0, 4, 6, 6));
 		private final JPanel subtotalPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-		private final Map<Integer, JPanel>  itemBoxes    = new HashMap<>();
-		private final Map<Integer, Integer> itemQtys     = new HashMap<>();
-		private final Map<Integer, Long>    itemGePrices = new HashMap<>(); // BUG FIX: store raw prices, not formatted strings
-		private final Map<Integer, Long>    itemHaPrices = new HashMap<>();
+		private final Map<Integer, JPanel> itemBoxes = new HashMap<>();
+		private final Map<Integer, Integer> itemQtys = new HashMap<>();
+		private final Map<Integer, Long> itemGePrices = new HashMap<>(); // BUG FIX: store raw prices, not formatted strings
+		private final Map<Integer, Long> itemHaPrices = new HashMap<>();
 		private final String category;
 
 		LootBox(String title, SkillLootTrackerPlugin plugin)
@@ -388,7 +393,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 			titleWrap.setOpaque(false);
 
 			JLabel icon = getSkillSprite(title);
-			if (icon != null)
+			if (icon!= null)
 			{
 				titleWrap.add(icon);
 			}
@@ -423,12 +428,12 @@ public class SkillLootTrackerPanel extends PluginPanel
 		{
 			switch (cat)
 			{
-				case "Fishing":     return new Color(52,  152, 219);
-				case "Mining":      return new Color(149, 165, 166);
-				case "Woodcutting": return new Color(39,  174, 96);
-				case "Farming":     return new Color(241, 196, 15);
-				case "Hunter":      return new Color(230, 126, 34);
-				default:            return ColorScheme.BRAND_ORANGE;
+				case "Fishing": return new Color(52, 152, 219);
+				case "Mining": return new Color(149, 165, 166);
+				case "Woodcutting": return new Color(39, 174, 96);
+				case "Farming": return new Color(241, 196, 15);
+				case "Hunter": return new Color(230, 126, 34);
+				default: return ColorScheme.BRAND_ORANGE;
 			}
 		}
 
@@ -437,11 +442,11 @@ public class SkillLootTrackerPanel extends PluginPanel
 			int spriteId;
 			switch (cat)
 			{
-				case "Fishing":     spriteId = SpriteID.SKILL_FISHING;     break;
-				case "Mining":      spriteId = SpriteID.SKILL_MINING;      break;
+				case "Fishing": spriteId = SpriteID.SKILL_FISHING; break;
+				case "Mining": spriteId = SpriteID.SKILL_MINING; break;
 				case "Woodcutting": spriteId = SpriteID.SKILL_WOODCUTTING; break;
-				case "Farming":     spriteId = SpriteID.SKILL_FARMING;     break;
-				case "Hunter":      spriteId = SpriteID.SKILL_HUNTER;      break;
+				case "Farming": spriteId = SpriteID.SKILL_FARMING; break;
+				case "Hunter": spriteId = SpriteID.SKILL_HUNTER; break;
 				default: return null;
 			}
 
@@ -464,7 +469,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 			if (qty <= 0)
 			{
 				JPanel old = itemBoxes.remove(id);
-				if (old != null)
+				if (old!= null)
 				{
 					itemGrid.remove(old);
 					itemQtys.remove(id);
@@ -529,8 +534,8 @@ public class SkillLootTrackerPanel extends PluginPanel
 						Long liveGe = itemGePrices.get(id);
 						Long liveHa = itemHaPrices.get(id);
 						String tip = buildTooltip(id, liveQty, itemName,
-								liveGe != null ? liveGe : 0L,
-								liveHa != null ? liveHa : 0L);
+								liveGe!= null? liveGe : 0L,
+								liveHa!= null? liveHa : 0L);
 						newBox.setToolTipText(tip);
 						content.setToolTipText(tip);
 						iconLabel.setToolTipText(tip);
@@ -557,7 +562,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 						menu.setBorder(BorderFactory.createLineBorder(ColorScheme.MEDIUM_GRAY_COLOR, 1));
 
 						boolean alreadyIgnored = plugin.isItemIgnored(itemId);
-						boolean alwaysIgnored  = plugin.isItemAlwaysIgnored(itemId);
+						boolean alwaysIgnored = plugin.isItemAlwaysIgnored(itemId);
 
 						if (!alreadyIgnored)
 						{
@@ -627,17 +632,12 @@ public class SkillLootTrackerPanel extends PluginPanel
 						wikiItem.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 						wikiItem.setOpaque(true);
 						wikiItem.addActionListener(ev -> {
-							try
-							{
-								String encoded = java.net.URLEncoder.encode(name, "UTF-8")
-										.replace("+", "_");
-								java.awt.Desktop.getDesktop().browse(
-										java.net.URI.create(
-												"https://oldschool.runescape.wiki/w/" + encoded));
-							}
-							catch (Exception ex)
-							{
-							}
+							String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8)
+									.replace("+", "_")
+									.replace("%28", "(")
+									.replace("%29", ")")
+									.replace("%27", "'");
+							LinkBrowser.browse("https://oldschool.runescape.wiki/w/" + encoded);
 						});
 						styleMenuItem(wikiItem);
 						menu.add(wikiItem);
@@ -707,12 +707,12 @@ public class SkillLootTrackerPanel extends PluginPanel
 			// silently lose precision. Now uses the raw long price maps.
 			for (Map.Entry<Integer, Integer> entry : itemQtys.entrySet())
 			{
-				int id  = entry.getKey();
+				int id = entry.getKey();
 				int qty = entry.getValue();
 				Long ge = itemGePrices.get(id);
 				Long ha = itemHaPrices.get(id);
-				if (ge != null) totalGe += ge * qty;
-				if (ha != null) totalHa += ha * qty;
+				if (ge!= null) totalGe += ge * qty;
+				if (ha!= null) totalHa += ha * qty;
 			}
 
 			JLabel gePill = new JLabel(QuantityFormatter.quantityToStackSize(totalGe) + " gp");
@@ -747,7 +747,7 @@ public class SkillLootTrackerPanel extends PluginPanel
 			resetBtn.addMouseListener(new MouseAdapter()
 			{
 				@Override public void mouseEntered(MouseEvent e) { resetBtn.setBackground(new Color(120, 40, 40)); }
-				@Override public void mouseExited(MouseEvent e)  { resetBtn.setBackground(new Color(80,  30, 30)); }
+				@Override public void mouseExited(MouseEvent e) { resetBtn.setBackground(new Color(80, 30, 30)); }
 			});
 			subtotalPanel.add(resetBtn);
 
