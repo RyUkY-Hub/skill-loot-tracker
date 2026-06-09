@@ -48,8 +48,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 @Slf4j
@@ -62,7 +60,6 @@ public class SkillLootTrackerPanel extends PluginPanel
 	private final JLabel timerLabel = new JLabel("Time: 00:00:00");
 	private final JLabel geValueLabel = new JLabel("GE: 0 gp");
 	private final JLabel haValueLabel = new JLabel("HA: 0 gp");
-	private final ExecutorService iconLoader = Executors.newSingleThreadExecutor();
 	private Consumer<String> onCategoryReset;
 
 	@Inject
@@ -304,11 +301,15 @@ public class SkillLootTrackerPanel extends PluginPanel
 		});
 	}
 
-	public void resetCategory(String category)
+	/**
+	 * Called by the plugin to remove a category's UI box without re-firing the
+	 * plugin callback (avoids the plugin→panel→plugin loop).
+	 */
+	public void removeCategoryBox(String category)
 	{
 		LootBox box = boxes.remove(category);
 		lastUpdateTimes.remove(category);
-		if (box!= null)
+		if (box != null)
 		{
 			SwingUtilities.invokeLater(() -> {
 				Component[] components = container.getComponents();
@@ -331,17 +332,53 @@ public class SkillLootTrackerPanel extends PluginPanel
 				container.revalidate();
 				container.repaint();
 			});
+		}
+	}
 
-			if (onCategoryReset!= null)
-			{
-				onCategoryReset.accept(category);
-			}
+	/**
+	 * Called by UI elements (e.g. the X button in a LootBox) to reset a category.
+	 * Removes the UI box and then fires the plugin callback so the plugin cleans up
+	 * its data and refreshes the inventory snapshot.
+	 */
+	public void resetCategory(String category)
+	{
+		LootBox box = boxes.remove(category);
+		lastUpdateTimes.remove(category);
+		if (box != null)
+		{
+			SwingUtilities.invokeLater(() -> {
+				Component[] components = container.getComponents();
+				for (int i = 0; i < components.length; i++)
+				{
+					if (components[i] == box)
+					{
+						container.remove(i);
+						if (i < container.getComponentCount())
+						{
+							Component next = container.getComponent(i);
+							if (next instanceof Box.Filler)
+							{
+								container.remove(i);
+							}
+						}
+						break;
+					}
+				}
+				container.revalidate();
+				container.repaint();
+
+				// Fire plugin callback after UI is fully updated
+				if (onCategoryReset != null)
+				{
+					onCategoryReset.accept(category);
+				}
+			});
 		}
 	}
 
 	public void shutdown()
 	{
-		iconLoader.shutdown();
+		// Nothing to shut down here; icon loading is managed by itemManager internally
 	}
 
 	private class LootBox extends JPanel
@@ -603,6 +640,19 @@ public class SkillLootTrackerPanel extends PluginPanel
 						sep.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
 						menu.add(sep);
 
+						JMenuItem resetItem = new JMenuItem("Reset: " + name);
+						resetItem.setFont(FontManager.getRunescapeSmallFont());
+						resetItem.setForeground(new Color(200, 200, 200));
+						resetItem.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+						resetItem.setOpaque(true);
+						resetItem.addActionListener(ev -> plugin.resetItem(itemId));
+						styleMenuItem(resetItem);
+						menu.add(resetItem);
+
+						JSeparator sep2 = new JSeparator();
+						sep2.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+						menu.add(sep2);
+
 						JMenuItem wikiItem = new JMenuItem("Wiki: " + name);
 						wikiItem.setFont(FontManager.getRunescapeSmallFont());
 						wikiItem.addActionListener(ev -> {
@@ -713,7 +763,16 @@ public class SkillLootTrackerPanel extends PluginPanel
 			resetBtn.setFocusable(false);
 			resetBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 			resetBtn.setToolTipText("Reset " + category);
-			resetBtn.addActionListener(e -> resetCategory(category));
+			resetBtn.addActionListener(e -> {
+				// Call the plugin directly; the plugin will call panel.resetCategory()
+				// which handles UI cleanup. Going through onCategoryReset here instead
+				// of SkillLootTrackerPanel.resetCategory() prevents the double-call loop
+				// where panel→plugin→panel would fire resetCategory twice.
+				if (onCategoryReset != null)
+				{
+					onCategoryReset.accept(category);
+				}
+			});
 			resetBtn.addMouseListener(new MouseAdapter()
 			{
 				@Override public void mouseEntered(MouseEvent e) { resetBtn.setBackground(new Color(120, 40, 40)); }

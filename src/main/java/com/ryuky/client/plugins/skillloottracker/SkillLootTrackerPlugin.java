@@ -302,10 +302,7 @@ public class SkillLootTrackerPlugin extends Plugin
 			.add(21552)  // Volcanic ash
 			.add(23491)  // Lovakite ore
 			// Motherlode Mine
-			.add(12602)  // Pay-dirt — BUG FIX: was missing
-			.add(453)    // Coal (duplicate but safe)
-			.add(444)    // Gold (duplicate safe)
-			.add(21347)  // Amethyst
+			.add(12602)  // Pay-dirt
 			// Dense essence block (Arceuus)
 			.add(13445)  // Dense essence block — BUG FIX: missing
 			.add(13446)  // Dark essence block
@@ -317,20 +314,18 @@ public class SkillLootTrackerPlugin extends Plugin
 			.add(26880)  // Guardian essence
 			.add(26882)  // Guardian stone
 			.add(25527).add(25528)
-			// Gem mine (Shilo Village)
-			.add(6971).add(6973).add(6975).add(6977).add(6979).add(6981).add(6983)
-			// Sandstone / granite
+			// Gem mine (Shilo Village) + Sandstone / Granite
 			.add(6967)   // Sandstone (1kg)
-			.add(6969)   // Sandstone (2kg)  — BUG FIX: missing
-			.add(6971)   // Sandstone (5kg)  — (also gem mine — safe dupe)
-			.add(6973)   // Sandstone (10kg)
-			.add(6975)   // Granite (500g)
-			.add(6977)   // Granite (2kg)
-			.add(6979)   // Granite (5kg)
+			.add(6969)   // Sandstone (2kg)
+			.add(6971)   // Sandstone (5kg) / Gem mine
+			.add(6973)   // Sandstone (10kg) / Gem mine
+			.add(6975)   // Granite (500g) / Gem mine
+			.add(6977)   // Granite (2kg) / Gem mine
+			.add(6979)   // Granite (5kg) / Gem mine
+			.add(6981).add(6983)  // Gem mine variants
 			// Crashed star (shooting stars)
-			.add(25527)  // Star fragment
-			.add(25628)  // Stardust — BUG FIX: was listed as 25627 (invalid)
-			.add(25627)  // Stardust (extra variant, kept for safety)
+			.add(25627)  // Stardust
+			.add(25628)  // Stardust (variant)
 			// Misc
 			.add(668)    // Elemental ore (elemental workshop)
 			.add(2892)   // Daeyalt ore
@@ -338,10 +333,8 @@ public class SkillLootTrackerPlugin extends Plugin
 			.add(21905)  // Primal ore (fossil island)
 			.add(9631)   // Barronite shard — BUG FIX: was missing
 			.add(9632)   // Barronite deposit — BUG FIX: was missing
-			.add(21552)  // Volcanic ash (dupe safe)
 			.add(31716)  // Abyssal pearl (GOTR)
 			.add(13321)  // Limestone
-			.add(25527)
 			.add(23996).add(23997)
 			.add(19668)  // Ancient essence
 			.add(13421)  // Minerals (unique)
@@ -765,11 +758,9 @@ public class SkillLootTrackerPlugin extends Plugin
 			// Drift net (also Fishing — Hunter takes priority when lastSkillAction = Hunter)
 			.add(10018)
 			// Chinchompa catching (specific)
-			.add(2000)   // BUG FIX: missing — chinchompa throwing (also the collecting anim)
-			// Impling jar catching
-			.add(6606)   // (dupe safe)
+			.add(2000)   // chinchompa throwing / collecting anim
 			// Butterfly net
-			.add(6760)   // BUG FIX: missing
+			.add(6760)
 			.build();
 
 	@Inject private Client client;
@@ -787,7 +778,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	private NavigationButton navButton;
 
 	private final Map<String, Map<Integer, Integer>> lootPerSkill = new ConcurrentHashMap<>();
-	private final Map<Integer, Integer> lastInventory = new HashMap<>();
+	private final Map<Integer, Integer> lastInventory = new ConcurrentHashMap<>();
 
 	private final AtomicBoolean resetInProgress = new AtomicBoolean(false);
 	private final AtomicBoolean dataLoaded = new AtomicBoolean(false);
@@ -798,7 +789,10 @@ public class SkillLootTrackerPlugin extends Plugin
 
 	private volatile String lastSkillAction = null;
 	private volatile long lastSkillActionTime = 0L;
-	private static final long SKILL_WINDOW_MS = 5000;
+	// Default skill window: 5 seconds. Farming gets a longer window because
+	// harvest animations fire per-item and can be several ticks apart.
+	private static final long SKILL_WINDOW_MS         = 5_000L;
+	private static final long FARMING_SKILL_WINDOW_MS = 12_000L;
 	private volatile long cachedTotalGe = 0L;
 	private volatile long cachedTotalHa = 0L;
 
@@ -963,6 +957,39 @@ public class SkillLootTrackerPlugin extends Plugin
 	}
 
 	/**
+	 * Removes a single item from all tracked categories and refreshes the panel.
+	 * The item will continue to be tracked if it is obtained again — this only
+	 * clears its current accumulated count.
+	 *
+	 * @param itemId the canonical item ID to reset
+	 */
+	public void resetItem(int itemId)
+	{
+		boolean anyRemoved = false;
+		for (Map.Entry<String, Map<Integer, Integer>> catEntry : lootPerSkill.entrySet())
+		{
+			if (catEntry.getValue().remove(itemId) != null)
+			{
+				anyRemoved = true;
+			}
+		}
+
+		if (anyRemoved)
+		{
+			clientThread.invoke(() -> {
+				for (String category : lootPerSkill.keySet())
+				{
+					panel.removeItem(itemId, category);
+				}
+				updatePanelTotals();
+			});
+			saveData();
+		}
+
+		log.debug("Skill Loot Tracker: reset item {}", itemId);
+	}
+
+	/**
 	 * Adds an item ID to the user-editable ignore list in config and immediately
 	 * updates the working customIgnoreIds set so the item stops being tracked.
 	 * Also removes that item from all tracked loot categories and refreshes the panel.
@@ -1056,12 +1083,17 @@ public class SkillLootTrackerPlugin extends Plugin
 	}
 
 	/**
-	 * Returns true if the item is in the ALWAYS_IGNORE hardcoded set,
-	 * meaning it cannot be un-ignored via the right-click menu.
+	 * Returns true if the item is permanently hardcoded as always-ignored and
+	 * therefore cannot be un-ignored via the right-click context menu.
+	 * Coins (995/996) are excluded here because their ignore state is controlled by
+	 * the ignoreCoins config toggle. Bird nests are similarly config-controlled.
 	 */
 	public boolean isItemAlwaysIgnored(int itemId)
 	{
-		return ALWAYS_IGNORE_IDS.contains(itemId) || BIRD_NEST_IDS.contains(itemId);
+		// Coins and bird nests are toggled by config — not permanently locked
+		if (itemId == 995 || itemId == 996) return false;
+		if (BIRD_NEST_IDS.contains(itemId)) return false;
+		return ALWAYS_IGNORE_IDS.contains(itemId);
 	}
 
 	private void resumeSession()
@@ -1259,15 +1291,15 @@ public class SkillLootTrackerPlugin extends Plugin
 	private boolean shouldTrackItem(String category)
 	{
 		long now = System.currentTimeMillis();
-		boolean recentSkillAction = (now - lastSkillActionTime) < SKILL_WINDOW_MS;
+		long elapsed = now - lastSkillActionTime;
 
 		switch (category)
 		{
-			case "Mining":     return recentSkillAction && "Mining".equals(lastSkillAction)     && config.trackMining();
-			case "Fishing":    return recentSkillAction && "Fishing".equals(lastSkillAction)    && config.trackFishing();
-			case "Woodcutting":return recentSkillAction && "Woodcutting".equals(lastSkillAction)&& config.trackWoodcutting();
-			case "Farming":    return recentSkillAction && "Farming".equals(lastSkillAction)    && config.trackFarming();
-			case "Hunter":     return recentSkillAction && "Hunter".equals(lastSkillAction)     && config.trackHunter();
+			case "Mining":      return elapsed < SKILL_WINDOW_MS         && "Mining".equals(lastSkillAction)      && config.trackMining();
+			case "Fishing":     return elapsed < SKILL_WINDOW_MS         && "Fishing".equals(lastSkillAction)     && config.trackFishing();
+			case "Woodcutting": return elapsed < SKILL_WINDOW_MS         && "Woodcutting".equals(lastSkillAction) && config.trackWoodcutting();
+			case "Farming":     return elapsed < FARMING_SKILL_WINDOW_MS && "Farming".equals(lastSkillAction)     && config.trackFarming();
+			case "Hunter":      return elapsed < SKILL_WINDOW_MS         && "Hunter".equals(lastSkillAction)      && config.trackHunter();
 			default: return false;
 		}
 	}
@@ -1350,25 +1382,33 @@ public class SkillLootTrackerPlugin extends Plugin
 
 		if (matchCount == 0) return null;
 
-		// Disambiguate via recent animation when item appears in multiple lists
-		if (matchCount > 1 && lastSkillAction != null)
+		// Single match — no ambiguity, return immediately
+		if (matchCount == 1)
+		{
+			if (wc)   return "Woodcutting";
+			if (fish) return "Fishing";
+			if (mine) return "Mining";
+			if (farm) return "Farming";
+			if (hunt) return "Hunter";
+		}
+
+		// Multiple matches — use lastSkillAction to disambiguate.
+		// Only return a category if lastSkillAction matches one of THIS item's categories.
+		// If lastSkillAction doesn't match any of the item's categories (e.g. Mining
+		// action but item is in both Farming and Hunter), return null rather than
+		// misattributing the item.
+		if (lastSkillAction != null)
 		{
 			switch (lastSkillAction)
 			{
-				case "Woodcutting": return wc   ? "Woodcutting" : null;
-				case "Mining":      return mine ? "Mining"      : null;
-				case "Fishing":     return fish ? "Fishing"     : null;
-				case "Farming":     return farm ? "Farming"     : null;
-				case "Hunter":      return hunt ? "Hunter"      : null;
+				case "Woodcutting": if (wc)   return "Woodcutting"; break;
+				case "Mining":      if (mine) return "Mining";      break;
+				case "Fishing":     if (fish) return "Fishing";     break;
+				case "Farming":     if (farm) return "Farming";     break;
+				case "Hunter":      if (hunt) return "Hunter";      break;
 			}
 		}
 
-		// Single match — return it regardless of lastSkillAction
-		if (wc)   return "Woodcutting";
-		if (fish) return "Fishing";
-		if (mine) return "Mining";
-		if (farm) return "Farming";
-		if (hunt) return "Hunter";
 		return null;
 	}
 
@@ -1411,6 +1451,8 @@ public class SkillLootTrackerPlugin extends Plugin
 	{
 		resetInProgress.set(true);
 		lootPerSkill.remove(category);
+		// Remove the UI box without re-firing the callback
+		panel.removeCategoryBox(category);
 		clientThread.invoke(() -> {
 			try
 			{
@@ -1433,7 +1475,6 @@ public class SkillLootTrackerPlugin extends Plugin
 					{
 						if (item.getId() > 0 && categoryIds.contains(item.getId()))
 						{
-							// BUG FIX: canonicalize here too
 							int canonicalId = itemManager.canonicalize(item.getId());
 							lastInventory.merge(canonicalId, item.getQuantity(), Integer::sum);
 						}
@@ -1452,7 +1493,7 @@ public class SkillLootTrackerPlugin extends Plugin
 	{
 		accumulatedTime = Duration.ZERO;
 		sessionStart = Instant.now();
-		updatePanelTotals();
+		clientThread.invoke(this::updatePanelTotals);
 		log.debug("Session timer reset via panel button");
 	}
 
